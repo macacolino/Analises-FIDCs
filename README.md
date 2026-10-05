@@ -17,6 +17,11 @@ Histórico desde jan/2013. Em ago/2026: 4.400 fundos/classes, PL somado de R$ 98
 
 ## Rodando
 
+### Jeito mais simples (no seu computador)
+Instale [Python 3.11+](https://www.python.org/downloads/) (marque "Add python.exe to PATH") e [Node.js LTS](https://nodejs.org/).
+Baixe o projeto e dê dois cliques em `iniciar.bat` (Windows) ou rode `./iniciar.sh` (Mac/Linux).
+Na primeira vez leva ~5 min (baixa os dados da CVM); depois abre em http://localhost:8000.
+
 ### Com Docker (servidor)
 ```bash
 docker compose up -d --build
