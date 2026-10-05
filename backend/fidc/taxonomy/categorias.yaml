@@ -1,0 +1,187 @@
+# Taxonomia de FIDCs
+# ==================
+# Cada fundo recebe a PRIMEIRA categoria (na ordem abaixo) cuja regra bate.
+# Ajuste manual feito no app sempre ganha das regras.
+#
+# Para criar uma categoria nova: copie um bloco, dê um id único e escreva as regras.
+# Não precisa mexer em código. Rode o build de novo (ou "Reclassificar" no app).
+#
+# Uma categoria tem uma lista `regras`; basta UMA regra bater (OU).
+# Dentro de uma regra, TODAS as condições precisam bater (E). Condições disponíveis:
+#
+#   nome_inclui:  [regex, ...]   nome do fundo contém algum dos termos (sem acento, maiúsculo)
+#   nome_exclui:  [regex, ...]   nome NÃO contém nenhum dos termos
+#   segmento_min: {segmentos: [F2, ...], pct: 0.5}
+#                 soma da participação desses segmentos da Tabela II na carteira >= pct
+#   top1_cedente_max / top1_cedente_min: % do maior cedente (Tabela I, 0-100)
+#   cotas_fidc_min: participação de cotas de FIDC no ativo (0-1)
+#   aquisicao_inad_min: aquisições de créditos já inadimplentes / aquisições totais, 12m (0-1)
+#   sem_carteira: true  -> fundo sem direitos creditórios na Tabela II
+#   revisar: true  -> marca o fundo para revisão manual (classificação de baixa confiança)
+#
+# Segmentos da Tabela II (informe mensal CVM):
+#   A indústria | B imobiliário | C1 comercial | C2 varejo | C3 arrendamento mercantil
+#   D1 serviços | D2 serviços públicos | D3 educacionais | D4 entretenimento | E agronegócio
+#   F1 crédito pessoal | F2 consignado | F3 corporativo | F4 middle market | F5 veículos
+#   F6 imob. empresarial | F7 imob. residencial | F8 outros financeiros | G cartão de crédito
+#   H1 factoring PF | H2 factoring PJ | I1 precatórios | I2 tributários | I3 royalties | I4 outros setor público
+#   J ações judiciais | K propriedade intelectual/marcas
+
+cortes:
+  dominante: 0.5               # segmento "dominante" = >= 50% da carteira
+  multicedente_top1_max: 15    # multicedente: maior cedente <= 15% (proposta inicial, calibrar)
+  monocedente_top1_min: 50     # mono-cedente: maior cedente >= 50%
+
+categorias:
+
+  - id: fic_fidc
+    nome: FIC-FIDC
+    grupo: Estruturas
+    regras:
+      - cotas_fidc_min: 0.5
+      - nome_inclui: ['\bFIC\b', 'COTAS DE FUNDOS? DE INVESTIMENTO EM DIREITOS']
+
+  - id: precatorios
+    nome: Precatórios
+    grupo: Setor público e judicial
+    regras:
+      - segmento_min: {segmentos: [I1], pct: 0.5}
+      - nome_inclui: ['PRECAT']
+
+  - id: fgts
+    nome: FGTS (antecipação saque-aniversário)
+    grupo: Crédito PF
+    regras:
+      - nome_inclui: ['FGTS', 'SAQUE.?ANIVERSARIO']
+
+  - id: npl
+    nome: NPL / créditos estressados
+    grupo: Estruturas
+    regras:
+      - aquisicao_inad_min: 0.5
+      - nome_inclui: ['\bNPL\b', 'NON.?PERFORMING', 'ESTRESSAD', 'DISTRESS', 'RECUPERACAO DE CREDITO']
+
+  - id: consignado_publico
+    nome: Consignado público
+    grupo: Consignado
+    regras:
+      - nome_inclui: ['\bINSS\b', 'SIAPE', 'CONSIG\w* PUBLICO', 'SERVIDOR']
+        nome_exclui: ['PRIVADO', '\bCLT\b', 'TRABALHADOR']
+      - segmento_min: {segmentos: [F2], pct: 0.5}
+        nome_inclui: ['INSS', 'SIAPE', 'SERVIDOR', 'PUBLICO', 'GOVERNO', 'PREFEITURA', 'MUNICIP',
+                      'ESTADUA', 'FEDERA', 'MILITAR', 'FORCAS ARMADAS', 'APOSENTAD', 'PENSIONISTA']
+
+  - id: consignado_privado
+    nome: Consignado privado
+    grupo: Consignado
+    regras:
+      - nome_inclui: ['CONSIGNADO PRIVADO', '\bCLT\b', 'TRABALHADOR', 'E-?CONSIGNADO']
+      - segmento_min: {segmentos: [F2], pct: 0.5}
+        nome_inclui: ['PRIVADO', '\bCLT\b', 'TRABALHADOR', 'EMPRESA']
+
+  - id: consignado_indefinido
+    nome: Consignado (público/privado a classificar)
+    grupo: Consignado
+    regras:
+      - segmento_min: {segmentos: [F2], pct: 0.5}
+        revisar: true
+      - nome_inclui: ['CONSIG']
+        revisar: true
+
+  - id: cartao
+    nome: Recebíveis de cartão
+    grupo: Crédito PF
+    regras:
+      - segmento_min: {segmentos: [G], pct: 0.5}
+      - nome_inclui: ['CARTAO', 'CARTOES', 'ADQUIRENCIA', 'ARRANJO']
+
+  - id: multicedente_multissacado
+    nome: Multicedente multissacado
+    grupo: Recebíveis comerciais
+    regras:
+      - nome_inclui: ['MULTI.?CEDENTE', 'MULTI.?SSACADO', 'MULTI.?SACADO']
+      - segmento_min: {segmentos: [A, C1, C2, D1, H1, H2, F8], pct: 0.5}
+        top1_cedente_max: 15
+
+  - id: risco_sacado
+    nome: Risco sacado / supply chain
+    grupo: Recebíveis comerciais
+    regras:
+      - nome_inclui: ['RISCO SACADO', 'FORNECEDOR', 'SUPPLY', 'FORFAIT', 'CADEIA']
+
+  - id: monocedente_comercial
+    nome: Recebíveis comerciais mono-cedente
+    grupo: Recebíveis comerciais
+    regras:
+      - segmento_min: {segmentos: [A, C1, C2, C3, D1, D2, D3, D4, H1, H2], pct: 0.5}
+        top1_cedente_min: 50
+
+  - id: recebiveis_comerciais_outros
+    nome: Recebíveis comerciais (pulverização intermediária)
+    grupo: Recebíveis comerciais
+    regras:
+      - segmento_min: {segmentos: [A, C1, C2, C3, D1, D2, D3, D4, H1, H2], pct: 0.5}
+
+  - id: credito_pessoal
+    nome: Crédito pessoal / CDC
+    grupo: Crédito PF
+    regras:
+      - segmento_min: {segmentos: [F1], pct: 0.5}
+
+  - id: veiculos
+    nome: Veículos
+    grupo: Crédito PF
+    regras:
+      - segmento_min: {segmentos: [F5], pct: 0.5}
+      - nome_inclui: ['VEICULO', 'AUTO\b', 'MOTOS?\b']
+
+  - id: imobiliario
+    nome: Imobiliário
+    grupo: Imobiliário
+    regras:
+      - segmento_min: {segmentos: [B, F6, F7], pct: 0.5}
+
+  - id: agro
+    nome: Agronegócio
+    grupo: Agro
+    regras:
+      - segmento_min: {segmentos: [E], pct: 0.5}
+      - nome_inclui: ['\bAGRO', '\bCPR\b']
+
+  - id: corporativo
+    nome: Crédito corporativo / middle market
+    grupo: Crédito PJ
+    regras:
+      - segmento_min: {segmentos: [F3, F4], pct: 0.5}
+
+  - id: judicial
+    nome: Direitos judiciais
+    grupo: Setor público e judicial
+    regras:
+      - segmento_min: {segmentos: [J], pct: 0.5}
+      - nome_inclui: ['JUDICI']
+
+  - id: setor_publico_outros
+    nome: Setor público (tributário, royalties, outros)
+    grupo: Setor público e judicial
+    regras:
+      - segmento_min: {segmentos: [I2, I3, I4], pct: 0.5}
+
+  - id: financeiro_outros
+    nome: Financeiro – outros (sem detalhe na CVM)
+    grupo: Outros
+    regras:
+      - segmento_min: {segmentos: [F8], pct: 0.5}
+        revisar: true
+
+  - id: sem_carteira
+    nome: Sem carteira de direitos creditórios informada
+    grupo: Outros
+    regras:
+      - sem_carteira: true
+
+  - id: outros
+    nome: Outros / não classificado
+    grupo: Outros
+    regras:
+      - revisar: true
