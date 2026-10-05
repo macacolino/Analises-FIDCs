@@ -5,11 +5,12 @@ import { fmtValue, mesAno } from '../fmt'
 import { BandChart, RankBars, Scatter2 } from './Charts'
 import { Loading } from './ui'
 
-export type PeerOpts = { modo: string; grupo_id?: number; uma_por_gestora: boolean; excluir_erro: boolean }
-export const defaultPeers: PeerOpts = { modo: 'categoria', uma_por_gestora: false, excluir_erro: true }
+export type PeerOpts = { modo: string; grupo_id?: number; uma_por_gestora: boolean; excluir_erro: boolean; ignorar_sem_vencido: boolean }
+export const defaultPeers: PeerOpts = { modo: 'categoria', uma_por_gestora: false, excluir_erro: true, ignorar_sem_vencido: true }
 
 export function peerQs(p: PeerOpts) {
-  const q = new URLSearchParams({ modo: p.modo, uma_por_gestora: String(p.uma_por_gestora), excluir_erro: String(p.excluir_erro) })
+  const q = new URLSearchParams({ modo: p.modo, uma_por_gestora: String(p.uma_por_gestora), excluir_erro: String(p.excluir_erro),
+    ignorar_sem_vencido: String(p.ignorar_sem_vencido) })
   if (p.modo === 'grupo' && p.grupo_id) q.set('grupo_id', String(p.grupo_id))
   return q.toString()
 }
@@ -36,6 +37,10 @@ export function PeerSelector({ value, onChange }: { value: PeerOpts; onChange: (
         <input type="checkbox" checked={value.excluir_erro} onChange={(e) => onChange({ ...value, excluir_erro: e.target.checked })} />
         excluir pares com dado inconsistente
       </label>
+      <label className="row" style={{ gap: 4 }} title="Fundos que declaram zero vencido em todas as faixas e na Tab. I ficam fora das estatísticas de inadimplência (zero não verificável)">
+        <input type="checkbox" checked={value.ignorar_sem_vencido} onChange={(e) => onChange({ ...value, ignorar_sem_vencido: e.target.checked })} />
+        ignorar "zero vencido" declarado nas métricas de inadimplência
+      </label>
     </div>
   )
 }
@@ -46,6 +51,7 @@ const POS: Record<string, [string, string, string]> = {
   neutro: ['●', 'entre P25 e P75', 'var(--muted)'],
   contexto: ['○', 'contexto', 'var(--muted)'],
   'n/d': ['–', 'sem dado', 'var(--muted)'],
+  zero_declarado: ['?', 'zero declarado (não verificável)', 'var(--muted)'],
 }
 
 export function Posicao({ p }: { p: string }) {
@@ -58,7 +64,7 @@ const NIVEL = ['', 'amarelo', 'vermelho']
 export function RedFlagChip({ nivel }: { nivel: number | null }) {
   if (nivel == null) return <span className="muted">n/d</span>
   if (nivel === 0) return <span className="muted">ok</span>
-  return <span className="badge" style={{ borderColor: nivel === 2 ? 'var(--critical)' : 'var(--warning)', color: 'var(--ink)' }}>
+  return <span className="badge" style={{ borderColor: nivel === 2 ? 'var(--critical)' : 'var(--warning)', color: 'var(--ink)', whiteSpace: 'nowrap' }}>
     <span style={{ width: 8, height: 8, borderRadius: 4, background: nivel === 2 ? 'var(--critical)' : 'var(--warning)' }} />
     {NIVEL[nivel]}
   </span>
@@ -85,7 +91,9 @@ export default function ComparePanel({ cnpj, peers }: { cnpj: string; peers: Pee
     <div className="stack">
       <div className="row" style={{ gap: 8 }}>
         <span className="sub">Data-base {mesAno(d.fundo.dt)}{d.fundo.defasado ? ' (defasado)' : ''} · {d.pares.descricao} · <b>n = {d.pares.n}</b> pares
-          (sem o próprio fundo)</span>
+          (sem o próprio fundo){d.pares.n_sem_vencido > 0 && peers.ignorar_sem_vencido
+            ? ` · ${d.pares.n_sem_vencido} declaram zero vencido e ficam fora das métricas de inadimplência` : ''}
+          {d.fundo.sem_vencido_declarado && <b> · este fundo declara zero vencido (não verificável)</b>}</span>
         <div className="spacer" />
         <a className="btn" href={`/api/comparar/${cnpj}?${qs}&formato=xlsx`}>⬇ Excel comparação</a>
         <a className="btn" href={`/api/fundos/${cnpj}/comite.xlsx?${qs}`}>⬇ Pacote do comitê</a>
@@ -103,24 +111,25 @@ export default function ComparePanel({ cnpj, peers }: { cnpj: string; peers: Pee
         ))}
       </div>
 
-      <div className="grid2" style={{ alignItems: 'start' }}>
+      <div className="stack">
         <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
           <table className="simple">
             <thead><tr><th>Métrica</th><th className="r">Fundo</th><th className="r">P25</th><th className="r">Mediana</th>
-              <th className="r">P75</th><th>Posição</th><th className="r" title="Percentil do fundo entre os pares (n ≥ 5)">Pctl</th>
+              <th className="r">P75</th><th className="r" title="Pares com dado nesta métrica">n</th><th>Posição</th><th className="r" title="Percentil do fundo entre os pares (n ≥ 5)">Pctl</th>
               <th className="r" title="Mediana do mercado inteiro">Mercado</th></tr></thead>
             <tbody>
               {blocos.map((b) => (
                 <Fragment key={b}>
-                  <tr><td colSpan={8} style={{ background: 'var(--surface-2)', fontWeight: 600 }}>{b}</td></tr>
+                  <tr><td colSpan={9} style={{ background: 'var(--surface-2)', fontWeight: 600 }}>{b}</td></tr>
                   {metricas.filter((m) => m.bloco === b).map((m) => (
-                    <tr key={m.metrica} onClick={() => setSel(m.metrica)} title={m.definicao}
+                    <tr key={m.metrica} onClick={() => setSel(m.metrica)} title={`${m.codigo ? m.codigo + ' · ' : ''}${m.definicao}`}
                       style={{ cursor: 'pointer', background: sel === m.metrica ? 'var(--surface-2)' : undefined }}>
                       <td>{m.label}</td>
                       <td className="r"><b>{fmtValue(m.valor, m.fmt)}</b></td>
                       <td className="r">{fmtValue(m.p25, m.fmt)}</td>
                       <td className="r">{fmtValue(m.mediana, m.fmt)}</td>
                       <td className="r">{fmtValue(m.p75, m.fmt)}</td>
+                      <td className="r muted">{m.n}</td>
                       <td><Posicao p={m.posicao} /></td>
                       <td className="r">{m.percentil == null ? '–' : Math.round(m.percentil * 100)}</td>
                       <td className="r muted">{fmtValue(m.mercado_mediana, m.fmt)}</td>
@@ -131,7 +140,7 @@ export default function ComparePanel({ cnpj, peers }: { cnpj: string; peers: Pee
             </tbody>
           </table>
         </div>
-        <div className="stack">
+        <div className="grid2" style={{ alignItems: 'start' }}>
           <div className="card">
             <h2>{selM?.label}</h2>
             <div className="muted" style={{ marginBottom: 8 }}>{selM?.definicao}</div>
@@ -165,10 +174,10 @@ export default function ComparePanel({ cnpj, peers }: { cnpj: string; peers: Pee
       <div className="card">
         <h2>Red flags (biblioteca MCMS, calculáveis pelo informe)</h2>
         <table className="simple">
-          <thead><tr><th>Red flag</th><th>Regra</th><th>Fundo</th><th className="r">% dos pares com flag</th></tr></thead>
+          <thead><tr><th>Red flag</th><th>Fundo</th><th>Número do fundo</th><th>Regra</th><th className="r">% dos pares com flag</th></tr></thead>
           <tbody>{d.red_flags.map((f: Row) => (
-            <tr key={f.id}><td>{f.nome}</td><td className="muted">{f.regra}</td><td><RedFlagChip nivel={f.nivel} /></td>
-              <td className="r">{fmtValue(f.pct_pares_com_flag, 'pct')}</td></tr>))}</tbody>
+            <tr key={f.id} title={f.codigo}><td>{f.nome}</td><td><RedFlagChip nivel={f.nivel} /></td><td>{f.detalhe}</td>
+              <td className="muted">{f.regra}</td><td className="r">{fmtValue(f.pct_pares_com_flag, 'pct')}</td></tr>))}</tbody>
         </table>
         <p className="muted">RF03, RF05, RF07, RF11–RF13, RF18, RF20–RF22 e RF25 dependem de regulamento, relatório do gestor ou notícias: ficam no Roteiro de DD.</p>
       </div>

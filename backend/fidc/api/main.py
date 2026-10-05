@@ -148,7 +148,7 @@ class CategoriaIn(BaseModel):
 
 @app.put("/api/fundos/{cnpj}/categoria")
 def set_categoria(cnpj: str, body: CategoriaIn, request: Request, bg: BackgroundTasks):
-    ids = {c.id for c in classify.load_taxonomy()}
+    ids = {c.id for c in classify.load_taxonomy() if not c.alias_de}
     if body.categoria not in ids:
         raise HTTPException(400, "Categoria inexistente")
     with appdb.session() as s:
@@ -290,7 +290,7 @@ def lista_eventos(tipo: str, dias: int = 60):
 # ------------------------------------------------------------------ taxonomia e ETL
 @app.get("/api/taxonomia")
 def taxonomia():
-    return [{"id": c.id, "nome": c.nome, "grupo": c.grupo} for c in classify.load_taxonomy()]
+    return [{"id": c.id, "nome": c.nome, "grupo": c.grupo} for c in classify.load_taxonomy() if not c.alias_de]
 
 
 def _run_etl(download: bool = True):

@@ -161,6 +161,11 @@ SELECT r.cnpj, r.dt,
   r.pdd / nullif(coalesce(r.scr_a, 0) * 0.005 + coalesce(r.scr_b, 0) * 0.01 + coalesce(r.scr_c, 0) * 0.03
     + coalesce(r.scr_d, 0) * 0.10 + coalesce(r.scr_e, 0) * 0.30 + coalesce(r.scr_f, 0) * 0.50
     + coalesce(r.scr_g, 0) * 0.70 + coalesce(r.scr_h, 0), 0) AS pdd_sobre_2682,
+  -- ===== insumos das red flags (para mostrar o número junto do sinal)
+  r.recompras / nullif(r.aquisicoes, 0) AS recompra_aquisicoes_mes,
+  r.recompras / nullif(r.recompras_contabil, 0) AS preco_recompra_mes,
+  r.meses_jr_negativa_12m, j.jr_neg_seguidos,
+  r.roll_ok AS roll_m0, r.roll_1 AS roll_m1, r.roll_2 AS roll_m2,
   -- ===== red flags calculáveis pelo informe (biblioteca MCMS v2.0, seção 6) - 0 ok, 1 amarelo, 2 vermelho
   CASE WHEN r.recompras / nullif(r.aquisicoes, 0) > 0.10 THEN 2
        WHEN r.recompras / nullif(r.aquisicoes, 0) > 0.05 THEN 1 ELSE 0 END AS rf01_recompra,

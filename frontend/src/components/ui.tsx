@@ -12,7 +12,7 @@ export function Kpi({ k, v, compare, label }: { k: string; v: any; compare?: Rea
   )
 }
 
-export type Alerta = { id: string; descricao: string; severidade: 'alta' | 'media' | 'info' }
+export type Alerta = { id: string; descricao: string; severidade: 'alta' | 'media' | 'info'; detalhe?: string }
 
 const SEV_LABEL = { alta: 'Alta', media: 'Média', info: 'Info' }
 
@@ -23,7 +23,7 @@ export function Alertas({ items }: { items: Alerta[] }) {
       {items.map((a) => (
         <div key={a.id} className={`alert sev-${a.severidade}`}>
           <span className="dot" aria-hidden />
-          <span><b>{SEV_LABEL[a.severidade]}:</b> {a.descricao}</span>
+          <span><b>{SEV_LABEL[a.severidade]}:</b> {a.descricao}{a.detalhe && <span className="muted"> — {a.detalhe}</span>}</span>
         </div>
       ))}
     </div>

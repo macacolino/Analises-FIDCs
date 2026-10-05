@@ -49,7 +49,7 @@ h3 { font-size: 14px; margin: 0 0 8px; font-weight: 600; color: var(--ink-2); }
 .topbar nav a { color: rgba(255,255,255,.75); padding: 6px 12px; border-radius: 6px; }
 .topbar nav a.active, .topbar nav a:hover { color: #fff; background: rgba(255,255,255,.12); text-decoration: none; }
 .topbar .meta { font-size: 12px; color: rgba(255,255,255,.7); white-space: nowrap; }
-main { padding: 20px 24px 48px; max-width: 1500px; margin: 0 auto; }
+main { padding: 20px 24px 48px; max-width: 1880px; margin: 0 auto; }
 @media (max-width: 760px) {
   .topbar { gap: 8px; padding: 0 16px; overflow-x: auto; }
   .topbar .meta { display: none; }

@@ -121,6 +121,12 @@ def _merge_catalogo() -> None:
         "vermelho": ("Vermelho", "int", ""), "over90_mediana": ("Over 90 (mediana)", "pct", ""),
         "subordinacao_mediana": ("Subordinação (mediana)", "pct", ""),
         "retorno_jr_mediana": ("Retorno Jr 12m (mediana)", "pct", ""), "valor": ("Valor", "num", ""),
+        "pl_serie": ("PL da série", "brl", "Quantidade de cotas × valor da cota (Tab. X.2)"),
+        "rentab_mes": ("Rentab. mês", "pct100", "Rentabilidade da série no mês informada pelo administrador (Tab. X.3)"),
+        "valor_cota": ("Valor da cota", "num", ""), "qt_cotas": ("Qtd. cotas", "num", ""),
+        "desempenho_real": ("Desempenho real", "pct100", ""), "desempenho_esperado": ("Desempenho esperado", "pct100", ""),
+        "tipo": ("Tipo de cota", "txt", "senior, mezanino ou subordinada (júnior), lido do nome da série"),
+        "serie": ("Série / subclasse", "txt", ""),
     })
 
 

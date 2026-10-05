@@ -37,6 +37,11 @@ class Regra:
     cotas_fidc_min: float | None = None
     aquisicao_inad_min: float | None = None
     sem_carteira: bool = False
+    sem_cedente: bool = False
+    pmr_min: float | None = None
+    pmr_max: float | None = None
+    taxa_min: float | None = None
+    taxa_max: float | None = None
     revisar: bool = False
 
     @classmethod
@@ -52,6 +57,9 @@ class Regra:
             cotas_fidc_min=d.get("cotas_fidc_min"),
             aquisicao_inad_min=d.get("aquisicao_inad_min"),
             sem_carteira=bool(d.get("sem_carteira", False)),
+            sem_cedente=bool(d.get("sem_cedente", False)),
+            pmr_min=d.get("pmr_min"), pmr_max=d.get("pmr_max"),
+            taxa_min=d.get("taxa_min"), taxa_max=d.get("taxa_max"),
             revisar=bool(d.get("revisar", False)),
         )
 
@@ -76,6 +84,15 @@ class Regra:
             return False
         if self.sem_carteira and not f.get("sem_carteira"):
             return False
+        if self.sem_cedente and not (top1 is None or pd.isna(top1)):
+            return False
+        for lim, campo, maior in ((self.pmr_min, "pmr", True), (self.pmr_max, "pmr", False),
+                                  (self.taxa_min, "taxa_ix", True), (self.taxa_max, "taxa_ix", False)):
+            if lim is None:
+                continue
+            v = f.get(campo)
+            if v is None or pd.isna(v) or (v < lim if maior else v > lim):
+                return False
         return True
 
 
@@ -85,6 +102,7 @@ class Categoria:
     nome: str
     grupo: str
     regras: list[Regra]
+    alias_de: str | None = None   # bloco de regras extra que classifica numa categoria já existente
 
 
 def load_taxonomy(path=None) -> list[Categoria]:
@@ -92,7 +110,7 @@ def load_taxonomy(path=None) -> list[Categoria]:
     cats = []
     for c in data["categorias"]:
         cats.append(Categoria(c["id"], c["nome"], c.get("grupo", "Outros"),
-                              [Regra.from_dict(r) for r in c.get("regras", [])]))
+                              [Regra.from_dict(r) for r in c.get("regras", [])], c.get("alias_de")))
     ids = [c.id for c in cats]
     if len(ids) != len(set(ids)):
         raise ValueError("ids de categoria duplicados em categorias.yaml")
@@ -118,11 +136,15 @@ WITH ult AS (
   GROUP BY cnpj
 ), ced AS (
   SELECT cnpj, dt, max(pct) FILTER (WHERE rank = 1) AS top1_cedente_pct FROM cedente_mes GROUP BY ALL
+), op AS (
+  SELECT m.cnpj, m.prazo_medio_dias AS pmr, c.m22_taxa_ix_aa AS taxa_ix
+  FROM metricas_mes m LEFT JOIN casa_mes c USING (cnpj, dt)
+  QUALIFY row_number() OVER (PARTITION BY m.cnpj ORDER BY m.dt DESC) = 1
 )
 SELECT u.cnpj, u.nome, u.dt,
        {', '.join(f'coalesce(u.seg_{s}, 0) AS seg_{s}' for s in SEGMENTOS)},
-       u.cotas_fidc, u.ativo, c.top1_cedente_pct, aq.sh_aquis_inad
-FROM ult u LEFT JOIN ced c USING (cnpj, dt) LEFT JOIN aq USING (cnpj)
+       u.cotas_fidc, u.ativo, c.top1_cedente_pct, aq.sh_aquis_inad, op.pmr, op.taxa_ix
+FROM ult u LEFT JOIN ced c USING (cnpj, dt) LEFT JOIN aq USING (cnpj) LEFT JOIN op USING (cnpj)
 """
 
 
@@ -154,7 +176,9 @@ def classify_frame(df: pd.DataFrame, cats: list[Categoria] | None = None,
             rows.append((f["cnpj"], c.id, c.nome, c.grupo, "manual", False))
             continue
         c, r, i = classify_one(f, cats)
-        origem = f"regra {i + 1}" if r else "padrão"
+        origem = (f"{c.id} regra {i + 1}" if c.alias_de else f"regra {i + 1}") if r else "padrão"
+        if c.alias_de:
+            c = by_id[c.alias_de]
         rows.append((f["cnpj"], c.id, c.nome, c.grupo, origem, bool(r.revisar) if r else True))
     out = pd.DataFrame(rows, columns=["cnpj", "categoria", "categoria_nome", "grupo", "origem", "revisar"])
     return out.merge(df[["cnpj", "segmento_principal", "segmento_principal_pct", "top1_cedente_pct",
@@ -167,7 +191,7 @@ def build_table(con) -> None:
     con.execute("CREATE OR REPLACE TABLE classificacao AS SELECT * FROM _cls")
     con.unregister("_cls")
     cats = load_taxonomy()
-    tax = pd.DataFrame([(i, c.id, c.nome, c.grupo) for i, c in enumerate(cats)],
+    tax = pd.DataFrame([(i, c.id, c.nome, c.grupo) for i, c in enumerate(cats) if not c.alias_de],
                        columns=["ordem", "categoria", "categoria_nome", "grupo"])
     con.register("_tax", tax)
     con.execute("CREATE OR REPLACE TABLE categoria AS SELECT * FROM _tax")

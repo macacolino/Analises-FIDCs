@@ -22,6 +22,9 @@ from .db import df
 _cache: dict = {}
 _lock = threading.Lock()
 RF_COLS = [r[0] for r in catalogo.RED_FLAGS]
+# métricas que dependem das faixas de atraso: fundos com zero vencido declarado (não verificável) saem das estatísticas
+AGING_KEYS = {"vencido_carteira", "over30_carteira", "over90_carteira", "over180_pl", "inad_contratos", "pdd_over90",
+              "roll_30_60", "roll_60_90", "m17_f30_media", "m17_f180_media", "inad_90_lag12", "m02_jr_vencidos360"}
 
 
 def _digits(s: str) -> str:
@@ -116,7 +119,7 @@ def _stat(vals: pd.Series, v, sentido: int) -> dict:
     return out
 
 
-def comparar(cnpj: str, **kw) -> dict:
+def comparar(cnpj: str, ignorar_sem_vencido: bool = True, **kw) -> dict:
     u = universo()
     cnpj = _digits(cnpj)
     me = u[u.cnpj == cnpj]
@@ -126,13 +129,20 @@ def comparar(cnpj: str, **kw) -> dict:
     pares, desc = resolver_pares(cnpj, **kw)
     mercado = u[(u.cnpj != cnpj) & (u.pl > 0) & (~u.pl_outlier.fillna(False)) & (u.q_status.fillna("ok") != "erro")]
     mets = []
+    zero_fundo = bool(row.get("sem_vencido_declarado"))
     for key, label, fmt, sentido, bloco, defin in catalogo.METRICAS:
         v = row.get(key)
         v = None if v is None or (isinstance(v, float) and not math.isfinite(v)) else float(v)
-        s = _stat(pares[key], v, sentido)
-        sm = _stat(mercado[key], v, sentido)
-        mets.append({"metrica": key, "label": label, "fmt": fmt, "sentido": sentido, "bloco": bloco,
-                     "definicao": defin, "valor": v, **s,
+        pp, mm = pares, mercado
+        if ignorar_sem_vencido and key in AGING_KEYS:
+            pp = pares[~pares.sem_vencido_declarado.fillna(False)]
+            mm = mercado[~mercado.sem_vencido_declarado.fillna(False)]
+        s = _stat(pp[key], v, sentido)
+        sm = _stat(mm[key], v, sentido)
+        if zero_fundo and key in AGING_KEYS:
+            s["posicao"] = "zero_declarado"
+        mets.append({"metrica": key, "codigo": catalogo.codigo(key), "label": label, "fmt": fmt, "sentido": sentido,
+                     "bloco": bloco, "definicao": defin, "valor": v, **s,
                      "mercado_mediana": sm["mediana"], "mercado_percentil": sm["percentil"]})
     blocos = []
     for b in catalogo.BLOCOS:
@@ -145,19 +155,22 @@ def comparar(cnpj: str, **kw) -> dict:
         lvl = row.get(col)
         lvl = None if lvl is None or (isinstance(lvl, float) and math.isnan(lvl)) else int(lvl)
         pct_pares = float((pares[col] >= 1).mean()) if len(pares) else None
-        rfs.append({"id": col, "nome": nome, "regra": regra, "nivel": lvl, "pct_pares_com_flag": pct_pares})
+        rfs.append({"id": col, "codigo": catalogo.codigo(col), "nome": nome, "regra": regra, "nivel": lvl,
+                    "detalhe": detalhe_rf(col, row), "pct_pares_com_flag": pct_pares})
     return {
         "fundo": {"cnpj": cnpj, "nome": row["nome"], "dt": str(row["dt"])[:10], "categoria": row["categoria_nome"],
+                  "sem_vencido_declarado": zero_fundo,
                   "gestor": row.get("gestor"), "defasado": bool(row["defasado"]), "q_status": row.get("q_status"),
                   "q_checks": row.get("q_checks")},
         "pares": {"descricao": desc, "n": len(pares),
+                  "n_sem_vencido": int(pares.sem_vencido_declarado.fillna(False).sum()),
                   "lista": pares[["cnpj", "nome", "gestor", "pl", "q_status"]].sort_values("pl", ascending=False)
                   .to_dict("records")},
         "metricas": mets, "blocos": blocos, "red_flags": rfs,
     }
 
 
-def serie_vs_pares(cnpj: str, metrica: str, meses: int = 24, **kw) -> pd.DataFrame:
+def serie_vs_pares(cnpj: str, metrica: str, meses: int = 24, ignorar_sem_vencido: bool = True, **kw) -> pd.DataFrame:
     if metrica not in catalogo.BY_KEY:
         raise ValueError("métrica inválida")
     pares, _ = resolver_pares(cnpj, **kw)
@@ -166,6 +179,7 @@ def serie_vs_pares(cnpj: str, metrica: str, meses: int = 24, **kw) -> pd.DataFra
     d = df(f"""
         SELECT cnpj, dt, {metrica} AS v FROM comp_mes
         WHERE cnpj IN ({ph}) AND NOT pl_outlier AND coalesce(q_status, 'ok') <> 'erro'
+          {f"AND (cnpj = '{ids[0]}' OR NOT coalesce(sem_vencido_declarado, false))" if ignorar_sem_vencido and metrica in AGING_KEYS else ""}
           AND dt > (SELECT ultimo_mes_completo FROM _meta) - INTERVAL {int(meses)} MONTH
           AND dt <= (SELECT ultimo_mes_completo FROM _meta)""", ids)
     me = d[d.cnpj == ids[0]].set_index("dt")["v"]
@@ -224,9 +238,11 @@ def o_que_mudou(cnpj: str) -> list[dict]:
         out.append({"metrica": k, "label": label, "fmt": fmt, "anterior": float(vb), "atual": float(va),
                     "delta": float(delta), "delta_fmt": "pct" if fmt == "brl" else fmt, "direcao": direcao})
     for col, nome, _ in catalogo.RED_FLAGS:
-        if (a[col] or 0) > (b[col] or 0):
-            out.append({"metrica": col, "label": f"{nome}: nível subiu para {'vermelho' if a[col] == 2 else 'amarelo'}",
-                        "direcao": "piora", "fmt": "txt"})
+        va, vb = a[col], b[col]
+        if pd.notna(va) and (pd.isna(vb) and va > 0 or pd.notna(vb) and va > vb):
+            cor = "vermelho" if va == 2 else "amarelo"
+            txt = f"{nome}: passou a ser calculada (12 meses de histórico) e já está {cor}" if pd.isna(vb) else f"{nome}: subiu para {cor}"
+            out.append({"metrica": col, "label": txt, "detalhe": detalhe_rf(col, a), "direcao": "piora", "fmt": "txt"})
     return out
 
 
@@ -360,3 +376,40 @@ def seed_grupos() -> None:
             for m in g.get("membros", []):
                 s.execute("INSERT INTO grupo_pares_membro (grupo_id, cnpj, incluir, motivo) VALUES (?, ?, ?, ?)",
                           [cur.lastrowid, _digits(m["cnpj"]), int(m.get("incluir", True)), m.get("motivo")])
+
+
+def _p(v, casas=1):
+    return "n/d" if v is None or pd.isna(v) else f"{v * 100:.{casas}f}%".replace(".", ",")
+
+
+def detalhe_rf(col: str, r) -> str:
+    """Frase com o número que acendeu (ou não) a red flag, na data-base do fundo."""
+    g = r.get
+    if col == "rf01_recompra":
+        return f"recompras = {_p(g('recompra_aquisicoes_mes'))} das aquisições do mês"
+    if col == "rf02_roll":
+        return (f"roll 1-30→31-60 nos últimos 3 meses: {_p(g('roll_m2'), 0)} → {_p(g('roll_m1'), 0)} → "
+                f"{_p(g('roll_m0'), 0)}")
+    if col == "rf04_vencido_180":
+        return f"vencido > 180 d = {_p(g('over180_pl'), 2)} do PL"
+    if col == "rf09_pdd_over90":
+        v = g("pdd_over90")
+        return "n/d" if v is None or pd.isna(v) else f"PDD cobre {v * 100:.0f}% do vencido > 90 d (Over 90 = {_p(g('over90_carteira'), 2)} da carteira)"
+    if col == "rf10_alavancagem":
+        return (f"PL 12m {_p(g('cresc_pl_12m'), 0)} × Jr 12m {_p(g('cresc_jr_12m'), 0)}; "
+                f"subordinação {('+' if (g('var_sub_12m') or 0) >= 0 else '')}{_p(g('var_sub_12m'))} em 12m")
+    if col == "rf14_jr_negativa":
+        n, s = g("meses_jr_negativa_12m"), g("jr_neg_seguidos")
+        return f"{0 if n is None or pd.isna(n) else int(n)} mês(es) com Jr negativa em 12m; maior sequência: {0 if s is None or pd.isna(s) else int(s)}"
+    if col == "rf16_rj":
+        return f"cedidos por empresas em RJ = {_p(g('m13_rj_pl'), 2)} do PL"
+    if col == "rf17_spread":
+        return f"excesso de spread observado 12m = {_p(g('m19_excesso_spread'))} a.a. (limiares calibrados para MCMS)"
+    if col == "rf19_recompra_desconto":
+        return f"recompra paga a {_p(g('preco_recompra_mes'))} do valor contábil no mês"
+    if col == "rf23_fuga_senior":
+        return f"resgate líquido da sênior em 12m = {_p(g('resgate_liq_sr_12m'))} do PL sênior de 12m atrás"
+    if col == "rf24_cedente":
+        v = g("top1_cedente_pct")
+        return "nenhum cedente listado no informe" if v is None or pd.isna(v) else f"maior cedente = {v:.1f}% (campo do informe)".replace(".", ",")
+    return ""

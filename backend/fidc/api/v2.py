@@ -58,9 +58,9 @@ def _clean(obj):
 def catalogo_json():
     rot = yaml.safe_load(open(ROTEIROS_FILE, encoding="utf-8"))
     return {
-        "metricas": [{"metrica": k, "label": l, "fmt": f, "sentido": s, "bloco": b, "definicao": d}
-                     for k, l, f, s, b, d in catalogo.METRICAS],
-        "red_flags": [{"id": i, "nome": n, "regra": r} for i, n, r in catalogo.RED_FLAGS],
+        "metricas": [{"metrica": k, "codigo": catalogo.codigo(k), "label": l, "fmt": f, "sentido": s, "bloco": b,
+                      "definicao": d} for k, l, f, s, b, d in catalogo.METRICAS],
+        "red_flags": [{"id": i, "codigo": catalogo.codigo(i), "nome": n, "regra": r} for i, n, r in catalogo.RED_FLAGS],
         "blocos": catalogo.BLOCOS,
         "parametros": [{"chave": k, "label": v[0], "fmt": v[1], "fonte": v[2], "uso": v[3]}
                        for k, v in rot["parametros"].items()],
@@ -70,9 +70,11 @@ def catalogo_json():
 # ------------------------------------------------------------------ comparação
 @router.get("/comparar/{cnpj}")
 def comparar(cnpj: str, modo: str = "categoria", grupo_id: int | None = None, cnpjs: str | None = None,
-             uma_por_gestora: bool = False, excluir_erro: bool = True, formato: str | None = None):
+             uma_por_gestora: bool = False, excluir_erro: bool = True, ignorar_sem_vencido: bool = True,
+             formato: str | None = None):
     try:
-        r = cp.comparar(cnpj, **_pares_kw(modo, grupo_id, cnpjs, uma_por_gestora, excluir_erro))
+        r = cp.comparar(cnpj, ignorar_sem_vencido=ignorar_sem_vencido,
+                        **_pares_kw(modo, grupo_id, cnpjs, uma_por_gestora, excluir_erro))
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
     if formato == "xlsx":
@@ -87,9 +89,10 @@ def comparar(cnpj: str, modo: str = "categoria", grupo_id: int | None = None, cn
 @router.get("/comparar/{cnpj}/serie")
 def comparar_serie(cnpj: str, metrica: str, meses: int = 24, modo: str = "categoria", grupo_id: int | None = None,
                    cnpjs: str | None = None, uma_por_gestora: bool = False, excluir_erro: bool = True,
-                   formato: str | None = None):
+                   ignorar_sem_vencido: bool = True, formato: str | None = None):
     try:
-        d = cp.serie_vs_pares(cnpj, metrica, meses, **_pares_kw(modo, grupo_id, cnpjs, uma_por_gestora, excluir_erro))
+        d = cp.serie_vs_pares(cnpj, metrica, meses, ignorar_sem_vencido=ignorar_sem_vencido,
+                              **_pares_kw(modo, grupo_id, cnpjs, uma_por_gestora, excluir_erro))
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     return _out(d, formato, "Série vs pares")
@@ -316,9 +319,11 @@ def set_resposta(cnpj: str, pergunta_id: str, body: RespostaIn, request: Request
 
 # ------------------------------------------------------------------ pacote do comitê (Excel)
 @router.get("/fundos/{cnpj}/comite.xlsx")
-def comite_xlsx(cnpj: str, modo: str = "categoria", grupo_id: int | None = None, uma_por_gestora: bool = False):
+def comite_xlsx(cnpj: str, modo: str = "categoria", grupo_id: int | None = None, uma_por_gestora: bool = False,
+                excluir_erro: bool = True, ignorar_sem_vencido: bool = True):
     try:
-        r = cp.comparar(cnpj, modo=modo, grupo_id=grupo_id, uma_por_gestora=uma_por_gestora)
+        r = cp.comparar(cnpj, modo=modo, grupo_id=grupo_id, uma_por_gestora=uma_por_gestora,
+                        excluir_erro=excluir_erro, ignorar_sem_vencido=ignorar_sem_vencido)
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
     c = consultas.cnpj_digits(cnpj)

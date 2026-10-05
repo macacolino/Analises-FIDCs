@@ -41,8 +41,19 @@ def test_multicedente_por_concentracao():
     assert cat(C1=0.9, top1=8) == "multicedente_multissacado"
     assert cat(C1=0.9, top1=70) == "monocedente_comercial"
     assert cat(C1=0.9, top1=30) == "recebiveis_comerciais_outros"
-    # sem informação de cedente não dá para afirmar multicedente
-    assert cat(C1=0.9, top1=None) == "recebiveis_comerciais_outros"
+    # nenhum cedente listado no informe = nenhum cedente relevante: multicedente (marcado para revisar), caso do MR FIDC
+    assert cat(C1=0.9, top1=None) == "multicedente_multissacado"
+
+
+def test_consignado_por_prazo_e_taxa():
+    # sem pista no nome: carteira longa = público; curta ou taxa alta = privado (heurística, revisar)
+    assert classify.classify_frame(pd.DataFrame([{**feat(nome="FIDC XPTO", F2=1.0), "pmr": 760, "taxa_ix": None,
+                                                  "segmento_principal": "F2", "segmento_principal_pct": 1.0}]), CATS
+                                   ).loc[0, "categoria"] == "consignado_publico"
+    assert cat(nome="FIDC XPTO", F2=1.0) == "consignado_indefinido"
+    f = feat(nome="FIDC XPTO", F2=1.0)
+    f.update(pmr=300, taxa_ix=None)
+    assert classify.classify_one(f, CATS)[0].id == "consignado_privado"
 
 
 def test_fic_e_sem_carteira():

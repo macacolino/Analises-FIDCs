@@ -32,7 +32,7 @@ export default function Fundo() {
   type Tab = 'pares' | 'geral' | 'casa' | 'safra' | 'stress' | 'carteira' | 'series' | 'qualidade' | 'regulamento' | 'roteiro' | 'eventos' | 'notas'
   const [tab, setTab] = useState<Tab>('pares')
   const [peers, setPeers] = useState<PeerOpts>(defaultPeers)
-  const comp = useApi<any>(`/api/comparar/${cnpj}?modo=categoria`)
+  const comp = useApi<any>(`/api/comparar/${cnpj}?modo=categoria&ignorar_sem_vencido=true`)
   const eventos = useApi<{ ok: boolean; aviso?: string; documentos: Row[] }>(tab === 'eventos' ? `/api/fundos/${cnpj}/eventos` : null)
 
   if (!lam.data) return <Loading q={lam} />
@@ -87,10 +87,13 @@ export default function Fundo() {
 
       <div className="grid2">
         <div className="card"><h2>Alertas</h2><Alertas items={lam.data.alertas} />
-          {comp.data && <div className="row" style={{ marginTop: 10, gap: 6 }}>
-            {comp.data.red_flags.filter((f: Row) => f.nivel > 0).map((f: Row) => (
-              <span key={f.id} title={f.regra}><RedFlagChip nivel={f.nivel} /> {f.nome}</span>))}
-          </div>}
+          {comp.data && comp.data.red_flags.some((f: Row) => f.nivel > 0) && (
+            <table className="simple" style={{ marginTop: 10 }}>
+              <thead><tr><th>Red flag</th><th>Nível</th><th>Número</th></tr></thead>
+              <tbody>{comp.data.red_flags.filter((f: Row) => f.nivel > 0).map((f: Row) => (
+                <tr key={f.id} title={`Regra: ${f.regra}`}><td>{f.nome}</td><td><RedFlagChip nivel={f.nivel} /></td>
+                  <td className="muted">{f.detalhe}</td></tr>))}</tbody>
+            </table>)}
         </div>
         <div className="card"><h2>O que mudou no mês</h2><Mudancas cnpj={cnpj} /></div>
       </div>

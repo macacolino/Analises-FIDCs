@@ -18,7 +18,7 @@ export default function Setor() {
   const tax = useTaxonomia()
   const setor = useApi<{ historico: Row[]; aging: Row[] }>(`/api/setores/${categoria}`)
   const [tab, setTab] = useState<'fundos' | 'series' | 'safra' | 'bcb' | 'orig' | 'gest' | 'rf' | 'dist'>('fundos')
-  const [tipoSerie, setTipoSerie] = useState('senior')
+  const [tipoSerie, setTipoSerie] = useState('')
   const [safraMetrica, setSafraMetrica] = useState('inad_90')
   const rankUrl = `/api/setores/${categoria}/ranking`
   const seriesUrl = `/api/ranking/series?categoria=${categoria}${tipoSerie ? `&tipo=${tipoSerie}` : ''}`
@@ -110,8 +110,8 @@ export default function Setor() {
           <DataGrid rows={series.data} exportUrl={seriesUrl} height={560}
             extra={(
               <select value={tipoSerie} onChange={(e) => setTipoSerie(e.target.value)}>
-                <option value="senior">Sênior</option><option value="mezanino">Mezanino</option>
-                <option value="subordinada">Subordinada</option><option value="">Todas</option>
+                <option value="">Todos os tipos de cota</option><option value="senior">Sênior</option>
+                <option value="mezanino">Mezanino</option><option value="subordinada">Subordinada (júnior)</option>
               </select>
             )}
             cols={['nome', 'serie', 'tipo', 'pl_serie', 'rentab_mes', { field: 'rentab_12m', sort: 'desc' },

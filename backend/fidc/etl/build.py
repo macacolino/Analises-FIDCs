@@ -526,6 +526,9 @@ SELECT m.cnpj, m.dt, m.nome, m.pl, m.pl_outlier, m.aging_suspeito,
        m.top5_cedentes_pct, m.giro_mes, m.prazo_medio_dias, m.liquidez_30_pl, m.scr_e_h,
        m.roll_30_60, m.roll_60_90, m.roll_90_120, m.inad_90_lag12, m.perda_aquisicoes_12m,
        m.recompra_subst_3m_carteira, m.inad_90_ajustada, m.dc_bruto, m.n_series, m.nr_cotistas,
+       -- nenhum vencido nas faixas (Tab. V/VI) nem na Tab. I: zero declarado, não verificável
+       (m.in_30 + m.in_60 + m.in_90 + m.in_120 + m.in_150 + m.in_180 + m.in_360 + m.in_720 + m.in_1080 + m.in_1080p = 0
+        AND coalesce(fm.dc_inadimplente, 0) + coalesce(fm.dc_a_vencer_c_parc_inad, 0) = 0) AS sem_vencido_declarado,
        c.* EXCLUDE (cnpj, dt, jr, mz, sr, meses_janela, m24_sub_efetiva),
        c.jr, c.mz, c.sr, c.meses_janela,
        c.m21_retorno_jr_12m / nullif(k.cdi_12m, 0) AS retorno_jr_pct_cdi,
@@ -534,6 +537,7 @@ SELECT m.cnpj, m.dt, m.nome, m.pl, m.pl_outlier, m.aging_suspeito,
        s1.f30 AS m17_f30_ultima, s1.f30_12 AS m17_f30_media, s2.f60_12 AS m17_f60_media, s5.f180_12 AS m17_f180_media
 FROM metricas_mes m
 JOIN casa_mes c USING (cnpj, dt)
+JOIN fundo_mes fm USING (cnpj, dt)
 LEFT JOIN cdi_mes k USING (dt)
 LEFT JOIN qualidade_resumo q USING (cnpj, dt)
 -- safra mais recente com F30 observável vence em m-1; F60 em m-2; F180 em m-5

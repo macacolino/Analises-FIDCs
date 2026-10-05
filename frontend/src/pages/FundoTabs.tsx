@@ -30,7 +30,7 @@ export function Mudancas({ cnpj }: { cnpj: string }) {
           {m.fmt !== 'txt' ? <>
             <td className="r">{fmtValue(m.anterior, m.fmt)} → <b>{fmtValue(m.atual, m.fmt)}</b></td>
             <td className="r muted">{m.delta_fmt === 'pct' && m.fmt !== 'brl' ? `${(m.delta * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} p.p.` : fmtValue(m.delta, m.delta_fmt)}</td>
-            <td className="muted">{m.direcao}</td></> : <td colSpan={3} className="muted">{m.direcao}</td>}
+            <td className="muted">{m.direcao}</td></> : <td colSpan={3} className="muted">{m.detalhe}</td>}
         </tr>))}</tbody>
     </table>
   )

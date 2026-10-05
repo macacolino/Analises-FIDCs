@@ -46,6 +46,10 @@ CHECKS = [
      "Classificação setorial do fundo pode estar errada."),
     ("Q16", "Rentabilidade de série fora de −50%/+50% no mês", "alerta",
      "Valor excluído das médias de rentabilidade."),
+    ("Q17", "Nenhum vencido declarado (faixas de atraso e Tab. I zeradas) com carteira de direitos creditórios", "info",
+     "Zero não verificável: na comparação, o fundo fica fora das estatísticas de inadimplência por padrão."),
+    ("Q18", "PDD acima de 1% da carteira sem nenhum vencido declarado", "alerta",
+     "Provável aging não preenchido (ou PDD por arrasto/coobrigação): inadimplência do fundo não é confiável."),
 ]
 
 QUALIDADE_SQL = r"""
@@ -115,6 +119,13 @@ WITH f AS (
   WHERE dc_bruto > 1e6 AND seg_total > 0 AND abs(seg_total / dc_bruto - 1) > 0.10
   UNION ALL
   SELECT cnpj, dt, 'Q16', n_extremas FROM s WHERE n_extremas > 0
+  UNION ALL
+  SELECT cnpj, dt, 'Q17', dc_bruto FROM f
+  WHERE dc_bruto > 1e6 AND in_soma = 0 AND coalesce(dc_inadimplente, 0) + coalesce(dc_a_vencer_c_parc_inad, 0) = 0
+  UNION ALL
+  SELECT cnpj, dt, 'Q18', pdd / dc_bruto FROM f
+  WHERE dc_bruto > 1e6 AND in_soma = 0 AND coalesce(dc_inadimplente, 0) + coalesce(dc_a_vencer_c_parc_inad, 0) = 0
+    AND pdd > 0.01 * dc_bruto
 )
 SELECT c.cnpj, c.dt, c.id, k.severidade, c.valor
 FROM checks c JOIN qualidade_check k USING (id)

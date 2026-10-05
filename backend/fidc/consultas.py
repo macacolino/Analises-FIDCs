@@ -323,7 +323,7 @@ def alertas(cnpjs: list[str]) -> dict[str, list[dict]]:
         for rid, desc, fn, sev in REGRAS_ALERTA:
             try:
                 if fn(a, b, s):
-                    lst.append({"id": rid, "descricao": desc, "severidade": sev})
+                    lst.append({"id": rid, "descricao": desc, "severidade": sev, "detalhe": _detalhe_alerta(rid, a, b, s)})
             except (TypeError, ZeroDivisionError):
                 pass
         if pd.Timestamp(a["dt"]) < ref:
@@ -392,3 +392,32 @@ def relatorio_lista(tipo: str) -> dict[str, pd.DataFrame]:
     alert_rows = [{"cnpj": c, "nome": p.set_index("cnpj").loc[c, "nome"], **a} for c, lst in al.items() for a in lst]
     return {"Resumo": p, "Alertas": pd.DataFrame(alert_rows), "Histórico 24m": hist,
             "Séries": series, "Cedentes": ced}
+
+
+def _pp(v, casas=2):
+    return "n/d" if v is None or pd.isna(v) else f"{v * 100:.{casas}f}%".replace(".", ",")
+
+
+def _detalhe_alerta(rid, a, b, s) -> str:
+    """Número por trás do alerta: valor atual, valor de 3 meses antes e referência da categoria."""
+    b = b or {}
+    s = s or {}
+    if rid == "subordinacao_queda":
+        return f"{_pp(b.get('subordinacao'))} → {_pp(a.get('subordinacao'))}"
+    if rid == "inad_alta":
+        return f"{_pp(b.get('inad_90'))} → {_pp(a.get('inad_90'))}"
+    if rid == "inad_vs_setor":
+        return f"fundo {_pp(a.get('inad_90'))} × mediana da categoria {_pp(s.get('inad_90_mediana'))}"
+    if rid == "pdd_alta":
+        return f"{_pp(b.get('pdd_carteira'))} → {_pp(a.get('pdd_carteira'))}"
+    if rid == "recompra":
+        return f"{_pp(a.get('recompra_subst_3m_carteira'))} da carteira em 3 meses"
+    if rid == "roll_alto":
+        return f"roll 31-60→61-90 = {_pp(a.get('roll_60_90'), 0)}"
+    if rid == "pl_queda":
+        return f"PL {b.get('pl', 0) / 1e6:,.1f} mi → {a.get('pl', 0) / 1e6:,.1f} mi".replace(",", "X").replace(".", ",").replace("X", ".")
+    if rid == "rentab_senior_neg":
+        return f"{a.get('rentab_senior'):.2f}% no mês (média das séries sêniores ponderada pelo PL)".replace(".", ",")
+    if rid == "concentracao":
+        return f"maior cedente = {a.get('top1_cedente_pct'):.1f}% (campo do informe)".replace(".", ",")
+    return ""
