@@ -6,7 +6,7 @@
     "ghcr.io/devcontainers/features/node:1": { "version": "22" }
   },
   // 1a vez: instala dependências, monta as telas e baixa os dados da CVM (~5 min)
-  "postCreateCommand": "pip install -r backend/requirements.txt && cd frontend && npm ci && npm run build && cd ../backend && python -m fidc.etl",
+  "postCreateCommand": "bash .devcontainer/start.sh",
   // toda vez que o codespace liga: sobe o app na porta 8000
   "postStartCommand": "bash .devcontainer/start.sh",
   "forwardPorts": [8000],
