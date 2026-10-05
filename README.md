@@ -57,6 +57,20 @@ hospedagem deve ser revisada com Segurança da Informação.
 
 ---
 
+## Novidades da v2
+- **Comparação fundo × pares × mercado** (foco principal): para cada uma das ~40 métricas, valor do fundo, P25/mediana/P75 dos pares
+  (sem o próprio fundo), percentil e posição por quartil no sentido da métrica; placar por bloco (colchão, perdas, concentração,
+  retorno, operação); série de 24 meses com faixa P25–P75; ranking dos pares; dispersão com eixos selecionáveis; "lado a lado" de até 8 fundos.
+  Pares = categoria, mercado ou **grupo salvo** (ex.: "Pares MCMS", carregado da Base MCMS de ago/26), com "1 fundo por gestora" e
+  exclusão de pares com dado inconsistente.
+- **Validação e consistência dos dados**: 16 checagens por informe (PL das séries × PL, aging × total, identidade I.2.a, balanço,
+  rentabilidade × cota, cedente fora de 0–100%, taxa IX fora de faixa, PDD × Res. 2.682, lacunas...). Página Qualidade, selo na lâmina.
+- **Métricas da casa (MCMS)** e **red flags** calculadas do informe para todos os fundos; **safras por mês de vencimento** (F30/F60/F180/F360).
+- **Stress test** dinâmico por fundo (parâmetros editáveis); **pacote do comitê** em Excel.
+- **Setor automatizado**: 39 séries do Banco Central por categoria; originadores/cedentes com razão social; gestores; red flags do setor; distribuição.
+- **Roteiro de DD** por categoria (consignado privado, MCMS, geral) e **dados manuais** de regulamento e gestor com fonte e data-base.
+- Mapeamento completo do que sai do informe e do que é manual: [docs/MAPEAMENTO_ANALISES.md](docs/MAPEAMENTO_ANALISES.md).
+
 ## Páginas
 | Página | O que tem |
 |---|---|
@@ -64,6 +78,9 @@ hospedagem deve ser revisada com Segurança da Informação.
 | **Setores** | Por categoria: evolução de PL, inadimplência, PDD, subordinação, rentabilidade e roll rates (agregado e mediana); aging da categoria; ranking de fundos; ranking de séries por rentabilidade 12m; curvas de safra de fundos |
 | **Pesquisa** | Busca por nome/CNPJ com filtro de categoria |
 | **Lâmina do fundo** | Cadastro, alertas, KPIs vs. mediana da categoria, evolução vs. setor, proxies de safra, posição percentual na categoria, aging e cedentes, séries, eventos FNET, notas, ajuste manual de categoria, export completo em Excel |
+| **Comparar** | Fundo × pares (categoria, grupo salvo, mercado) e lado a lado |
+| **Grupos de pares** | Benchmarks da equipe com Incluir S/N e painel de métricas |
+| **Qualidade** | Checagens de consistência por mês e fundos com falha |
 | **Carteira / Watchlist** | Painel com variação de 3 meses, comparação com o setor, alertas, eventos FNET de 90 dias, relatório mensal em Excel (resumo, alertas, histórico 24m, séries, cedentes) |
 
 ---

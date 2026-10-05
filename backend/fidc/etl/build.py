@@ -22,7 +22,7 @@ import duckdb
 
 from .. import config
 from ..taxonomy import classify
-from . import cvm_cadastro
+from . import bcb, casa, cvm_cadastro, qualidade
 
 log = logging.getLogger(__name__)
 
@@ -81,6 +81,11 @@ def _buckets(s: _Src, prefix: str, letter: str, kind: str) -> list[str]:
     return [f"TAB_{prefix}_{letter}{i + 1}_VL_{kind}_{x}" for i, x in enumerate(sfx)]
 
 
+ITENS = [(1, "CRED_VENC_AD"), (2, "CRED_VENC_INAD"), (3, "CRED_INAD"), (4, "CRED_DIRCRED_PERFM"),
+         (5, "CRED_VENCIDO_PENDENTE"), (6, "CRED_EMP_RECUP"), (7, "CRED_RECEITA_PUBLICA"),
+         (8, "CRED_ACAO_JUDIC"), (9, "CRED_FATOR_RISCO"), (10, "CRED_DIVERSO")]
+
+
 def build_fundo_mes(con) -> None:
     i = _Src(con, "I")
     cedente_cols = []
@@ -112,6 +117,20 @@ def build_fundo_mes(con) -> None:
         {i.num('TAB_I2A6_VL_CRED_EMP_RECUP', 'TAB_I2B6_VL_CRED_EMP_RECUP')} AS dc_empresa_recup,
         {i.num('TAB_I2A8_VL_CRED_ACAO_JUDIC', 'TAB_I2B8_VL_CRED_ACAO_JUDIC')} AS dc_acao_judicial,
         abs({i.num('TAB_I2A11_VL_REDUCAO_RECUP', 'TAB_I2B11_VL_REDUCAO_RECUP')}) AS pdd,
+        abs({i.num('TAB_I2A11_VL_REDUCAO_RECUP')}) AS pdd_com_risco,
+        abs({i.num('TAB_I2B11_VL_REDUCAO_RECUP')}) AS pdd_sem_risco,
+        {i.num('TAB_I2A5_VL_CRED_VENCIDO_PENDENTE', 'TAB_I2B5_VL_CRED_VENCIDO_PENDENTE')} AS dc_vencido_na_cessao,
+        -- soma dos itens 1-10 (para checar a identidade itens - PDD = total)
+        {i.num(*[f'TAB_I2A{k}_VL_{n}' for k, n in ITENS])} AS soma_itens_com_risco,
+        {i.num(*[f'TAB_I2B{k}_VL_{n}' for k, n in ITENS])} AS soma_itens_sem_risco,
+        {i.num('TAB_I2C1_VL_DEBENTURE')} AS debentures,
+        {i.num('TAB_I2C2_VL_CRI')} AS cri,
+        {i.num('TAB_I2C3_VL_NP_COMERC')} AS np_comercial,
+        {i.num('TAB_I2C4_VL_LETRA_FINANC')} AS letras_financeiras,
+        {i.num('TAB_I2C5_VL_COTA_FIF', 'TAB_I2C5_VL_COTA_FUNDO_ICVM555')} AS cotas_fundos,
+        {i.num('TAB_I4_VL_OUTRO_ATIVO')} AS outros_ativos,
+        {i.num('TAB_I4A_VL_CPRAZO')} AS outros_ativos_cp,
+        {i.num('TAB_I4B_VL_LPRAZO')} AS outros_ativos_lp,
         {i.num('TAB_I2C_VL_VLMOB')} AS valores_mobiliarios,
         {i.num('TAB_I2D_VL_TITPUB_FED')} AS titulos_publicos,
         {i.num('TAB_I2E_VL_CDB')} AS cdb,
@@ -158,7 +177,9 @@ def build_fundo_mes(con) -> None:
         cols = ", ".join(
             [f"{s.num(c)} AS av_{lb}" for c, lb in zip(av, labels)]
             + [f"{s.num(c)} AS in_{lb}" for c, lb in zip(bi, labels)]
-            + [f"{s.num(f'TAB_{prefix}_C_VL_DIRCRED_ANTECIPADO')} AS antecipado"])
+            + [f"{s.num(f'TAB_{prefix}_C_VL_DIRCRED_ANTECIPADO')} AS antecipado",
+               f"{s.num(f'TAB_{prefix}_A_VL_DIRCRED_PRAZO')} AS av_total_inf",
+               f"{s.num(f'TAB_{prefix}_B_VL_DIRCRED_INAD')} AS in_total_inf"])
         con.execute(f"CREATE TABLE {name} AS " + _single(con, prefix, cols))
 
     vii = _Src(con, "VII")
@@ -169,13 +190,18 @@ def build_fundo_mes(con) -> None:
         {vii.num('TAB_VII_B2_2_VL_PREST')} AS alienacao_prestador,
         {vii.num('TAB_VII_B3_2_VL_TERCEIRO')} AS alienacao_terceiro,
         {vii.num('TAB_VII_C_2_VL_SUBST')} AS substituicoes,
-        {vii.num('TAB_VII_D_2_VL_RECOMPRA')} AS recompras
+        {vii.num('TAB_VII_D_2_VL_RECOMPRA')} AS recompras,
+        {vii.num('TAB_VII_D_3_VL_CONTAB_RECOMPRA')} AS recompras_contabil,
+        {vii.num('TAB_VII_D_1_QT_RECOMPRA')} AS recompras_qt,
+        {vii.num('TAB_VII_A1_2_VL_DIRCRED_RISCO')} AS aquisicoes_com_risco,
+        {vii.num('TAB_VII_A3_2_VL_DIRCRED_VENC_AD')} AS aquisicoes_a_vencer_adimpl
     """))
 
     ix = _Src(con, "IX")
     con.execute("CREATE TABLE t_ix AS " + _single(con, "IX", f"""
         {ix.num('TAB_IX_A1_1_2_COMPRA_MEDIA')} AS taxa_desconto_compra,
-        {ix.num('TAB_IX_A2_1_2_COMPRA_MEDIA')} AS taxa_juros_compra
+        {ix.num('TAB_IX_A2_1_2_COMPRA_MEDIA')} AS taxa_juros_compra,
+        {ix.num('TAB_IX_B1_1_2_COMPRA_MEDIA')} AS taxa_desconto_compra_sem_risco
     """))
 
     x = _Src(con, "X")
@@ -211,6 +237,10 @@ def build_fundo_mes(con) -> None:
         SELECT i.*, ii.* EXCLUDE (cnpj, dt), iii.passivo, iv.pl, iv.pl_medio,
                {vcols('')},
                coalesce(v.antecipado, 0) + coalesce(vi.antecipado, 0) AS antecipado,
+               CASE WHEN v.av_total_inf IS NULL AND vi.av_total_inf IS NULL THEN NULL
+                    ELSE coalesce(v.av_total_inf, 0) + coalesce(vi.av_total_inf, 0) END AS av_total_inf,
+               CASE WHEN v.in_total_inf IS NULL AND vi.in_total_inf IS NULL THEN NULL
+                    ELSE coalesce(v.in_total_inf, 0) + coalesce(vi.in_total_inf, 0) END AS in_total_inf,
                vii.* EXCLUDE (cnpj, dt), ix.* EXCLUDE (cnpj, dt), x.* EXCLUDE (cnpj, dt),
                x5.* EXCLUDE (cnpj, dt), x7.* EXCLUDE (cnpj, dt), x11.* EXCLUDE (cnpj, dt)
         FROM t_i i
@@ -235,7 +265,7 @@ def build_fundo_mes(con) -> None:
         SELECT cnpj, dt, k AS rank,
                regexp_replace(doc, '[^0-9]', '', 'g') AS cedente_doc,
                -- percentuais fora de 0-100 são erro de preenchimento
-               CASE WHEN pr BETWEEN 0 AND 100 THEN pr END AS pct
+               CASE WHEN pr BETWEEN 0 AND 100 THEN pr END AS pct, pr AS pct_raw
         FROM (
           SELECT cnpj, dt, unnest([{', '.join(str(k) for k in range(1, 10))}]) AS k,
                  unnest([{', '.join(f'ced_doc_{k}' for k in range(1, 10))}]) AS doc,
@@ -291,6 +321,30 @@ def build_serie_mes(con) -> None:
     """)
     for t in ("t_x1", "t_x2", "t_x3", "t_x6"):
         con.execute(f"DROP TABLE {t}")
+
+    # fluxos de cotas (Tab. X.4) por tipo de cota: captação, resgate, amortização
+    x4 = _Src(con, "X_4")
+    con.execute(f"""
+        CREATE TABLE fluxo_mes AS
+        WITH r AS (
+          SELECT * EXCLUDE (_src) FROM (
+            SELECT {x4.key()}, _src,
+                   strip_accents(coalesce({x4.txt('TAB_X_CLASSE_SERIE')}, '')) AS serie,
+                   {x4.txt('TAB_X_TP_OPER')} AS op, {x4.num('TAB_X_VL_TOTAL')} AS valor
+            FROM {x4.scan()})
+          WHERE cnpj IS NOT NULL AND dt IS NOT NULL
+          QUALIFY _src = max(_src) OVER (PARTITION BY cnpj, dt)
+        )
+        SELECT cnpj, dt,
+               CASE WHEN serie ILIKE '%mezanino%' THEN 'mezanino'
+                    WHEN serie ILIKE '%subordinad%' THEN 'subordinada'
+                    ELSE 'senior' END AS tipo,
+               sum(valor) FILTER (WHERE op ILIKE 'Capta%') AS captacoes,
+               sum(valor) FILTER (WHERE op ILIKE 'Resgates no%') AS resgates,
+               sum(valor) FILTER (WHERE op ILIKE 'Amortiza%') AS amortizacoes,
+               sum(valor) FILTER (WHERE op ILIKE 'Resgates Solic%') AS resgates_solicitados
+        FROM r GROUP BY ALL
+    """)
 
 
 METRICAS_SQL = """
@@ -354,7 +408,8 @@ SELECT
   pl, pl_medio, ativo, carteira, dc_liquido, dc_bruto, pdd, disponibilidades, passivo, cotas_fidc,
   pl / nullif(pl_ant, 0) - 1 AS pl_var_mes,
   -- PL 10x maior que o mês anterior E o seguinte: erro de preenchimento típico; fica fora dos agregados
-  coalesce(pl > 10 * greatest(pl_ant, 1e6) AND pl > 10 * greatest(pl_prox, 1e6), false) AS pl_outlier,
+  coalesce(pl_ant IS NOT NULL AND pl_prox IS NOT NULL
+           AND pl > 10 * greatest(pl_ant, 1e6) AND pl > 10 * greatest(pl_prox, 1e6), false) AS pl_outlier,
   -- inadimplência (parcelas vencidas, Tab. V+VI) sobre carteira bruta
   inad_parcelas / nullif(dc_bruto, 0) AS inad_total,
   inad_parcelas_90 / nullif(dc_bruto, 0) AS inad_90,
@@ -380,7 +435,7 @@ SELECT
   taxa_desconto_compra, taxa_juros_compra,
   -- prazo médio a vencer (ponto médio das faixas, em dias)
   (av_30 * 15 + av_60 * 45 + av_90 * 75 + av_120 * 105 + av_150 * 135 + av_180 * 165
-   + av_360 * 270 + av_720 * 540 + av_1080 * 900 + av_1080p * 1440) / nullif(a_vencer, 0) AS prazo_medio_dias,
+   + av_360 * 270 + av_720 * 540 + av_1080 * 900 + av_1080p * 1260) / nullif(a_vencer, 0) AS prazo_medio_dias,
   -- liquidez e risco
   (coalesce(liq_0, 0) + coalesce(liq_30, 0)) / nullif(pl, 0) AS liquidez_30_pl,
   (coalesce(scr_e, 0) + coalesce(scr_f, 0) + coalesce(scr_g, 0) + coalesce(scr_h, 0))
@@ -455,6 +510,39 @@ FROM m GROUP BY ALL
 """
 
 
+# Tabela larga usada nas comparações (fundo x pares x mercado): tudo que é comparável, por fundo x mês
+COMP_SQL = """
+CREATE TABLE comp_mes AS
+WITH sv AS (
+  SELECT cnpj, safra, f30,
+         avg(f30) OVER (PARTITION BY cnpj ORDER BY safra RANGE BETWEEN INTERVAL 11 MONTH PRECEDING AND CURRENT ROW) AS f30_12,
+         avg(f60) OVER (PARTITION BY cnpj ORDER BY safra RANGE BETWEEN INTERVAL 11 MONTH PRECEDING AND CURRENT ROW) AS f60_12,
+         avg(f180) OVER (PARTITION BY cnpj ORDER BY safra RANGE BETWEEN INTERVAL 11 MONTH PRECEDING AND CURRENT ROW) AS f180_12
+  FROM safra_venc
+)
+SELECT m.cnpj, m.dt, m.nome, m.pl, m.pl_outlier, m.aging_suspeito,
+       m.inad_total, m.inad_90, m.inad_contratos, m.pdd_carteira, m.cobertura_pdd_90, m.subordinacao,
+       m.subordinacao_junior, m.rentab_senior, m.rentab_mezanino, m.rentab_subordinada, m.top1_cedente_pct,
+       m.top5_cedentes_pct, m.giro_mes, m.prazo_medio_dias, m.liquidez_30_pl, m.scr_e_h,
+       m.roll_30_60, m.roll_60_90, m.roll_90_120, m.inad_90_lag12, m.perda_aquisicoes_12m,
+       m.recompra_subst_3m_carteira, m.inad_90_ajustada, m.dc_bruto, m.n_series, m.nr_cotistas,
+       c.* EXCLUDE (cnpj, dt, jr, mz, sr, meses_janela, m24_sub_efetiva),
+       c.jr, c.mz, c.sr, c.meses_janela,
+       c.m21_retorno_jr_12m / nullif(k.cdi_12m, 0) AS retorno_jr_pct_cdi,
+       c.m21_retorno_jr_12m - k.cdi_12m AS retorno_jr_menos_cdi,
+       q.n_erros AS q_erros, q.n_alertas AS q_alertas, q.status AS q_status, q.checks AS q_checks,
+       s1.f30 AS m17_f30_ultima, s1.f30_12 AS m17_f30_media, s2.f60_12 AS m17_f60_media, s5.f180_12 AS m17_f180_media
+FROM metricas_mes m
+JOIN casa_mes c USING (cnpj, dt)
+LEFT JOIN cdi_mes k USING (dt)
+LEFT JOIN qualidade_resumo q USING (cnpj, dt)
+-- safra mais recente com F30 observável vence em m-1; F60 em m-2; F180 em m-5
+LEFT JOIN sv s1 ON s1.cnpj = m.cnpj AND s1.safra = CAST(last_day(m.dt - INTERVAL 1 MONTH) AS DATE)
+LEFT JOIN sv s2 ON s2.cnpj = m.cnpj AND s2.safra = CAST(last_day(m.dt - INTERVAL 2 MONTH) AS DATE)
+LEFT JOIN sv s5 ON s5.cnpj = m.cnpj AND s5.safra = CAST(last_day(m.dt - INTERVAL 5 MONTH) AS DATE)
+"""
+
+
 def build(db_path: Path | None = None) -> Path:
     """Reconstrói a base inteira. Retorna o caminho do arquivo final."""
     final = Path(db_path or config.DB_PATH)
@@ -465,7 +553,12 @@ def build(db_path: Path | None = None) -> Path:
     log.info("fundo_mes"); build_fundo_mes(con)
     log.info("serie_mes"); build_serie_mes(con)
     log.info("metricas_mes"); con.execute(METRICAS_SQL)
+    log.info("bcb"); bcb.build_table(con)
+    log.info("casa_mes / safras"); casa.build(con)
+    log.info("qualidade"); qualidade.build(con)
     log.info("classificacao"); classify.build_table(con)
+    log.info("comp_mes")
+    con.execute(COMP_SQL)
     log.info("setor_mes"); con.execute(SETOR_SQL)
     log.info("cadastro"); cvm_cadastro.build_table(con)
     con.execute("""

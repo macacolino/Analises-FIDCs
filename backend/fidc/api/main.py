@@ -20,7 +20,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import appdb, consultas, dicionario, excel, fnet
+from .. import appdb, comparacao, consultas, dicionario, excel, fnet
+from . import v2
 from ..etl import pipeline
 from ..taxonomy import classify
 
@@ -29,6 +30,10 @@ log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app):
+    try:
+        comparacao.seed_grupos()
+    except Exception:  # noqa: BLE001 - seed é conveniência
+        log.exception("falha ao carregar grupos iniciais")
     if os.environ.get("FIDC_AGENDADOR", "1") == "1":
         threading.Thread(target=_agendador, daemon=True).start()
     yield
@@ -324,6 +329,9 @@ def _agendador():
 @app.exception_handler(RuntimeError)
 def _runtime(_, exc: RuntimeError):
     return JSONResponse({"detail": str(exc)}, status_code=503)
+
+
+app.include_router(v2.router)
 
 
 # ------------------------------------------------------------------ frontend (build estático)

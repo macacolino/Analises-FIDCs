@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApi, useTaxonomia, type Row } from '../api'
-import { Bars, TimeLines } from '../components/Charts'
+import { Bars, RankBars, TimeLines } from '../components/Charts'
 import { DataGrid } from '../components/DataGrid'
 import { Kpi, Loading, Tabs } from '../components/ui'
-import { mesAno } from '../fmt'
+import { fmtValue, mesAno } from '../fmt'
 
 const SAFRA_METRICAS: [string, string][] = [
   ['inad_90', 'Inad. >90d'], ['pdd_carteira', 'PDD / carteira'], ['inad_90_lag12', 'Inad. defasada 12m'],
@@ -17,7 +17,7 @@ export default function Setor() {
   const nav = useNavigate()
   const tax = useTaxonomia()
   const setor = useApi<{ historico: Row[]; aging: Row[] }>(`/api/setores/${categoria}`)
-  const [tab, setTab] = useState<'fundos' | 'series' | 'safra'>('fundos')
+  const [tab, setTab] = useState<'fundos' | 'series' | 'safra' | 'bcb' | 'orig' | 'gest' | 'rf' | 'dist'>('fundos')
   const [tipoSerie, setTipoSerie] = useState('senior')
   const [safraMetrica, setSafraMetrica] = useState('inad_90')
   const rankUrl = `/api/setores/${categoria}/ranking`
@@ -99,7 +99,7 @@ export default function Setor() {
         </div>
       )}
       <div className="card">
-        <Tabs value={tab} onChange={setTab} options={[['fundos', 'Ranking de fundos'], ['series', 'Ranking de séries (rentabilidade)'], ['safra', 'Safra de fundos']]} />
+        <Tabs value={tab} onChange={setTab} options={[['fundos', 'Ranking de fundos'], ['dist', 'Distribuição'], ['series', 'Ranking de séries'], ['rf', 'Red flags do setor'], ['bcb', 'Mercado (Banco Central)'], ['orig', 'Originadores / cedentes'], ['gest', 'Gestores'], ['safra', 'Safra de fundos']]} />
         {tab === 'fundos' && (
           <DataGrid rows={ranking.data} exportUrl={rankUrl} height={560}
             cols={['nome', 'gestor', { field: 'pl', sort: 'desc' }, 'inad_90', 'inad_contratos', 'pdd_carteira',
@@ -117,6 +117,13 @@ export default function Setor() {
             cols={['nome', 'serie', 'tipo', 'pl_serie', 'rentab_mes', { field: 'rentab_12m', sort: 'desc' },
                    'subordinacao', 'inad_90', 'pdd_carteira']} />
         )}
+        {tab === 'bcb' && <SetorBcb categoria={categoria} />}
+        {tab === 'orig' && <SetorTabela url={`/api/setores/${categoria}/originadores`} cols={['nome_cedente', 'cedente', 'n_fundos', 'exposicao_estimada', 'maior_pct', { field: 'fundos', width: 500 }]}
+          nota="Cedentes declarados na Tab. I do informe (até 9 por fundo). Nomes pela Receita (BrasilAPI). Exposição = % do cedente × carteira bruta do fundo - estimativa." />}
+        {tab === 'gest' && <SetorTabela url={`/api/setores/${categoria}/gestores`} cols={['nome', 'n_fundos', 'pl_total', 'over90_mediana', 'subordinacao_mediana', 'retorno_jr_mediana']} />}
+        {tab === 'rf' && <SetorTabela url={`/api/setores/${categoria}/redflags`} cols={['red_flag', { field: 'regra', width: 380 }, 'n_fundos', 'amarelo', 'vermelho', 'pct_com_flag', 'pl_com_flag']}
+          nota="Fundos da categoria no mês de referência; red flags calculadas pelo informe (biblioteca MCMS)." />}
+        {tab === 'dist' && <Distribuicao categoria={categoria} />}
         {tab === 'safra' && (
           <div className="stack">
             <div className="row">
@@ -140,3 +147,77 @@ export default function Setor() {
 }
 
 const fmtP = (v: number | null) => (v == null ? '–' : (v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '%')
+
+function SetorTabela({ url, cols, nota }: { url: string; cols: any[]; nota?: string }) {
+  const d = useApi<Row[]>(url)
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      <Loading q={d} />
+      <DataGrid rows={d.data} exportUrl={url} height={520} cols={cols} pinned={1} />
+      {nota && <p className="muted">{nota}</p>}
+    </div>
+  )
+}
+
+const METRICAS_BCB: [string, string, string][] = [
+  ['inadimplencia', 'Inadimplência (% carteira, > 90 d)', 'pct100'], ['taxa', 'Taxa média de juros (% a.a.)', 'pct100'],
+  ['saldo', 'Saldo da carteira (R$ milhões)', 'int'], ['concessoes', 'Concessões no mês (R$ milhões)', 'int'],
+]
+
+function SetorBcb({ categoria }: { categoria: string }) {
+  const d = useApi<Row[]>(`/api/setores/${categoria}/bcb`)
+  const porMetrica = useMemo(() => {
+    const out: Record<string, { data: Row[]; series: { key: string; label: string }[] }> = {}
+    for (const [m] of METRICAS_BCB) {
+      const rows = (d.data ?? []).filter((r) => r.metrica === m)
+      const nomes = [...new Set(rows.map((r) => r.nome))].slice(0, 8)
+      const byDt = new Map<string, Row>()
+      for (const r of rows) {
+        const row = byDt.get(r.dt) ?? { dt: r.dt }
+        row[`c${r.codigo}`] = r.valor
+        byDt.set(r.dt, row)
+      }
+      const codes = [...new Set(rows.map((r) => r.codigo))].slice(0, 8)
+      out[m] = { data: [...byDt.values()].sort((a, b) => (a.dt < b.dt ? -1 : 1)),
+                 series: codes.map((c, i) => ({ key: `c${c}`, label: nomes[i] ?? String(c) })) }
+    }
+    return out
+  }, [d.data])
+  if (d.data && !d.data.length) return <div className="muted">Sem série do Banco Central mapeada para esta categoria (editar taxonomy/setor_bcb.yaml).</div>
+  return (
+    <div className="stack">
+      <Loading q={d} />
+      <div className="row"><span className="sub">Fonte: Banco Central, SGS (atualização automática no ETL diário).</span><div className="spacer" />
+        <a className="btn" href={`/api/setores/${categoria}/bcb?formato=xlsx`}>⬇ Excel</a></div>
+      <div className="grid2">
+        {METRICAS_BCB.map(([m, t, f]) => porMetrica[m]?.data.length ? (
+          <div key={m} className="card"><TimeLines title={t} data={porMetrica[m].data} series={porMetrica[m].series} fmt={f} /></div>) : null)}
+      </div>
+    </div>
+  )
+}
+
+function Distribuicao({ categoria }: { categoria: string }) {
+  const nav = useNavigate()
+  const cat = useApi<any>('/api/catalogo', { staleTime: Infinity })
+  const [m, setM] = useState('over90_carteira')
+  const d = useApi<Row[]>(`/api/setores/${categoria}/distribuicao?metrica=${m}`)
+  const meta = cat.data?.metricas?.find((x: Row) => x.metrica === m)
+  const vals = (d.data ?? []).map((r) => r.valor).sort((a, b) => a - b)
+  const q = (p: number) => (vals.length ? vals[Math.floor(p * (vals.length - 1))] : null)
+  return (
+    <div className="stack">
+      <div className="row">
+        <select value={m} onChange={(e) => setM(e.target.value)}>
+          {cat.data?.metricas?.map((x: Row) => <option key={x.metrica} value={x.metrica}>{x.label}</option>)}
+        </select>
+        <span className="sub">n = {vals.length} · P25 {fmtValue(q(0.25), meta?.fmt)} · mediana {fmtValue(q(0.5), meta?.fmt)} · P75 {fmtValue(q(0.75), meta?.fmt)}</span>
+      </div>
+      <div className="legend"><span><i style={{ background: 'var(--s2)' }} />na carteira / watchlist</span><span><i style={{ background: 'var(--axis)' }} />demais fundos</span></div>
+      {d.data && <RankBars fmt={meta?.fmt ?? 'pct'} destaque="" height={320}
+        data={d.data.map((r) => ({ cnpj: r.cnpj, nome: r.nome, valor: r.valor, marca: r.listas || undefined }))}
+        onClick={(c) => nav(`/fundo/${c}`)} />}
+      <p className="muted">Fundos da categoria no mês de referência, sem os com erro de consistência. Clique numa barra para abrir a lâmina.</p>
+    </div>
+  )
+}

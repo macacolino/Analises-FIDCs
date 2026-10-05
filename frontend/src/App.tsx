@@ -1,7 +1,10 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import { useMeta } from './api'
 import { fmtDate, mesAno } from './fmt'
+import Comparar from './pages/Comparar'
 import Fundo from './pages/Fundo'
+import Grupos from './pages/Grupos'
+import Qualidade from './pages/Qualidade'
 import Lista from './pages/Lista'
 import Mercado from './pages/Mercado'
 import Pesquisa from './pages/Pesquisa'
@@ -17,8 +20,11 @@ export default function App() {
           <NavLink to="/" end>Mercado</NavLink>
           <NavLink to="/setores">Setores</NavLink>
           <NavLink to="/pesquisa">Pesquisa</NavLink>
+          <NavLink to="/comparar">Comparar</NavLink>
           <NavLink to="/carteira">Carteira</NavLink>
           <NavLink to="/watchlist">Watchlist</NavLink>
+          <NavLink to="/grupos">Grupos de pares</NavLink>
+          <NavLink to="/qualidade">Qualidade</NavLink>
         </nav>
         {meta.data && (
           <span className="meta" title={`Último mês com dados parciais: ${mesAno(meta.data.ultimo_mes)}`}>
@@ -32,6 +38,9 @@ export default function App() {
           <Route path="/setores" element={<Setor />} />
           <Route path="/setores/:categoria" element={<Setor />} />
           <Route path="/pesquisa" element={<Pesquisa />} />
+          <Route path="/comparar" element={<Comparar />} />
+          <Route path="/grupos" element={<Grupos />} />
+          <Route path="/qualidade" element={<Qualidade />} />
           <Route path="/fundo/:cnpj" element={<Fundo />} />
           <Route path="/carteira" element={<Lista tipo="carteira" />} />
           <Route path="/watchlist" element={<Lista tipo="watchlist" />} />

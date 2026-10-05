@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import threading
 
-from . import build, cvm_cadastro, cvm_download, cvm_load
+from . import bcb, build, cvm_cadastro, cvm_download, cvm_load
 
 log = logging.getLogger(__name__)
 _lock = threading.Lock()
@@ -18,6 +18,10 @@ def run(download: bool = True) -> dict:
         changed: list[str] = []
         if download:
             changed = cvm_download.download()
+            try:
+                bcb.download()
+            except Exception as e:  # noqa: BLE001 - contexto setorial é complementar
+                log.warning("falha ao baixar séries do BCB: %s", e)
             try:
                 cvm_cadastro.download()
             except Exception as e:  # noqa: BLE001 - cadastro é complementar

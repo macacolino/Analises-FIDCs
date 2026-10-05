@@ -79,10 +79,12 @@ D: dict[str, tuple[str, str, str]] = {
 
 
 def label(col: str) -> str:
+    _merge_catalogo()
     return D.get(col, (col, "", ""))[0]
 
 
 def fmt(col: str) -> str:
+    _merge_catalogo()
     if col in D:
         return D[col][1]
     if col.endswith("_mediana"):
@@ -90,5 +92,38 @@ def fmt(col: str) -> str:
     return ""
 
 
+def _merge_catalogo() -> None:
+    from . import catalogo
+    for key, label, fmt, _sentido, _bloco, defin in catalogo.METRICAS:
+        D.setdefault(key, (label, fmt, defin))
+    for key, nome, regra in catalogo.RED_FLAGS:
+        D.setdefault(key, (nome, "int", regra))
+    D.update({
+        "jr": ("PL Jr", "brl", ""), "mz": ("PL mezanino", "brl", ""), "sr": ("PL sênior", "brl", ""),
+        "q_status": ("Qualidade do dado", "txt", "ok / alerta / erro pelas checagens de consistência"),
+        "q_erros": ("Erros de consistência", "int", ""), "q_alertas": ("Alertas de consistência", "int", ""),
+        "q_checks": ("Checagens que falharam", "txt", ""), "m17_f30_ultima": ("F30 da safra mais recente", "pct", ""),
+        "m17_f60_media": ("F60 médio das safras", "pct", ""), "retorno_jr_menos_cdi": ("Retorno Jr 12m − CDI", "pct", ""),
+        "pdd_2682": ("PDD implícita Res. 2.682", "brl", ""), "baixas_12m": ("Baixas estimadas 12m", "brl", ""),
+        "avencer_de_inadimplentes": ("A vencer de créditos com parcela vencida", "brl", ""),
+        "pdd_adicional_extremo": ("PDD adicional no cenário extremo", "brl",
+                                  "Todo o vencido + o a vencer de créditos com parcela vencida viram perda, menos a PDD atual"),
+        "jr_pos_extremo": ("Jr após o cenário extremo", "brl", ""),
+        "m22_cobertura": ("Cobertura da taxa IX (aquisições válidas / total)", "pct", ""),
+        "base": ("Base da safra (a vencer ≤30d)", "brl", ""), "f30": ("F30", "pct", "Vencidos 31-60d em m+1 / base"),
+        "f60": ("F60", "pct", "Vencidos 61-90d em m+2 / base"), "f180": ("F180", "pct", "Vencidos 151-180d em m+5 / base"),
+        "f360": ("F360", "pct", "Vencidos 361-720d em m+12 / base"), "safra": ("Safra (mês de vencimento)", "data", ""),
+        "f30_base_aquisicoes": ("F30 sobre aquisições do mês anterior", "pct", ""),
+        "exposicao_estimada": ("Exposição estimada", "brl", "% do cedente × carteira bruta do fundo"),
+        "maior_pct": ("Maior % em um fundo", "pct100", ""), "nome_cedente": ("Cedente", "txt", ""),
+        "cedente": ("CNPJ do cedente", "txt", ""), "pct_com_flag": ("% dos fundos com flag", "pct", ""),
+        "pl_com_flag": ("PL dos fundos com flag", "brl", ""), "amarelo": ("Amarelo", "int", ""),
+        "vermelho": ("Vermelho", "int", ""), "over90_mediana": ("Over 90 (mediana)", "pct", ""),
+        "subordinacao_mediana": ("Subordinação (mediana)", "pct", ""),
+        "retorno_jr_mediana": ("Retorno Jr 12m (mediana)", "pct", ""), "valor": ("Valor", "num", ""),
+    })
+
+
 def as_json() -> dict:
+    _merge_catalogo()
     return {k: {"label": v[0], "fmt": v[1], "desc": v[2]} for k, v in D.items()}

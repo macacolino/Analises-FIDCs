@@ -5,7 +5,9 @@ import { send, useApi, useDic, useTaxonomia, type Row } from '../api'
 import { Bars, TimeLines } from '../components/Charts'
 import { DataGrid } from '../components/DataGrid'
 import { Alertas, Kpi, Loading, Tabs, type Alerta } from '../components/ui'
-import { colLabel, fmtCnpj, fmtDate, fmtValue, mesAno } from '../fmt'
+import ComparePanel, { defaultPeers, PeerSelector, RedFlagChip, type PeerOpts } from '../components/Comparar'
+import { Casa, Mudancas, QualidadeBadge, QualidadeFundo, Regulamento, Roteiro, Safras, Stress } from './FundoTabs'
+import { fmtCnpj, fmtDate, fmtValue, mesAno } from '../fmt'
 
 type Lamina = {
   cabecalho: Row; kpis: Row; comparativo: Row[]; series: Row[]; cedentes: Row[]; aging: Row[]
@@ -27,7 +29,10 @@ export default function Fundo() {
   const { data: dic } = useDic()
   const lam = useApi<Lamina>(`/api/fundos/${cnpj}`)
   const hist = useApi<Row[]>(`/api/fundos/${cnpj}/historico?meses=60`)
-  const [tab, setTab] = useState<'geral' | 'safra' | 'comp' | 'carteira' | 'series' | 'eventos' | 'notas'>('geral')
+  type Tab = 'pares' | 'geral' | 'casa' | 'safra' | 'stress' | 'carteira' | 'series' | 'qualidade' | 'regulamento' | 'roteiro' | 'eventos' | 'notas'
+  const [tab, setTab] = useState<Tab>('pares')
+  const [peers, setPeers] = useState<PeerOpts>(defaultPeers)
+  const comp = useApi<any>(`/api/comparar/${cnpj}?modo=categoria`)
   const eventos = useApi<{ ok: boolean; aviso?: string; documentos: Row[] }>(tab === 'eventos' ? `/api/fundos/${cnpj}/eventos` : null)
 
   if (!lam.data) return <Loading q={lam} />
@@ -38,9 +43,9 @@ export default function Fundo() {
     else await send('POST', `/api/listas/${tipo}`, { cnpj })
     refresh(); qc.invalidateQueries({ queryKey: [`/api/listas/${tipo}`] })
   }
-  const comp = Object.fromEntries(lam.data.comparativo.map((c) => [c.metrica, c]))
+  const compSetor = Object.fromEntries(lam.data.comparativo.map((c) => [c.metrica, c]))
   const vsSetor = (key: string) => {
-    const c = comp[key]
+    const c = compSetor[key]
     if (!c || c.mediana == null) return undefined
     return <>mediana setor {fmtValue(c.mediana, dic?.[key]?.fmt)}</>
   }
@@ -54,6 +59,7 @@ export default function Fundo() {
             <div className="sub">
               {fmtCnpj(h.cnpj)} · <Link to={`/setores/${h.categoria}`}>{h.categoria_nome}</Link>
               {h.revisar && <span className="badge" style={{ marginLeft: 6 }} title="Classificação automática de baixa confiança">⚠ revisar categoria</span>}
+              {' '}<QualidadeBadge status={comp.data?.fundo?.q_status} checks={comp.data?.fundo?.q_checks} />
               {' '}· segmento CVM: {SEG[h.segmento_principal] ?? '–'} ({fmtValue(h.segmento_principal_pct, 'pct')})
             </div>
           </div>
@@ -62,7 +68,9 @@ export default function Fundo() {
               {listas.includes('carteira') ? '✓ Na carteira' : '+ Carteira'}</button>
             <button className={listas.includes('watchlist') ? 'primary' : ''} onClick={() => toggle('watchlist')}>
               {listas.includes('watchlist') ? '✓ Na watchlist' : '+ Watchlist'}</button>
+            <Link className="btn" to={`/comparar?cnpj=${cnpj}`}>Comparar</Link>
             <a className="btn" href={`/api/fundos/${cnpj}/lamina.xlsx`}>⬇ Lâmina Excel</a>
+            <a className="btn" href={`/api/fundos/${cnpj}/comite.xlsx`}>⬇ Pacote do comitê</a>
           </div>
         </div>
         <table className="simple" style={{ maxWidth: 1100 }}>
@@ -77,7 +85,15 @@ export default function Fundo() {
         </table>
       </div>
 
-      <div className="card"><h2>Alertas</h2><Alertas items={lam.data.alertas} /></div>
+      <div className="grid2">
+        <div className="card"><h2>Alertas</h2><Alertas items={lam.data.alertas} />
+          {comp.data && <div className="row" style={{ marginTop: 10, gap: 6 }}>
+            {comp.data.red_flags.filter((f: Row) => f.nivel > 0).map((f: Row) => (
+              <span key={f.id} title={f.regra}><RedFlagChip nivel={f.nivel} /> {f.nome}</span>))}
+          </div>}
+        </div>
+        <div className="card"><h2>O que mudou no mês</h2><Mudancas cnpj={cnpj} /></div>
+      </div>
 
       <div className="kpis">
         <Kpi k="pl" v={k.pl} compare={<>mês {fmtValue(k.pl_var_mes, 'pct')}</>} />
@@ -96,8 +112,21 @@ export default function Fundo() {
 
       <div className="card">
         <Tabs value={tab} onChange={setTab} options={[
-          ['geral', 'Evolução'], ['safra', 'Proxies de safra'], ['comp', 'Vs. categoria'], ['carteira', 'Carteira e cedentes'],
-          ['series', 'Séries'], ['eventos', 'Eventos FNET'], ['notas', `Notas (${lam.data.notas.length})`]]} />
+          ['pares', 'Vs. pares'], ['geral', 'Evolução'], ['casa', 'Métricas da casa'], ['safra', 'Safras e proxies'],
+          ['stress', 'Stress'], ['carteira', 'Carteira e cedentes'], ['series', 'Séries'], ['qualidade', 'Qualidade do dado'],
+          ['regulamento', 'Regulamento e gestor'], ['roteiro', 'Roteiro de DD'], ['eventos', 'Eventos FNET'],
+          ['notas', `Notas (${lam.data.notas.length})`]]} />
+        {tab === 'pares' && (
+          <div className="stack">
+            <PeerSelector value={peers} onChange={setPeers} />
+            <ComparePanel cnpj={cnpj} peers={peers} />
+          </div>
+        )}
+        {tab === 'casa' && <Casa cnpj={cnpj} />}
+        {tab === 'stress' && <Stress cnpj={cnpj} />}
+        {tab === 'qualidade' && <QualidadeFundo cnpj={cnpj} />}
+        {tab === 'regulamento' && <Regulamento cnpj={cnpj} />}
+        {tab === 'roteiro' && <Roteiro cnpj={cnpj} />}
         <Loading q={hist} />
         {tab === 'geral' && hist.data && (
           <div className="grid2">
@@ -116,6 +145,8 @@ export default function Fundo() {
         )}
         {tab === 'safra' && hist.data && (
           <div className="stack">
+            <Safras cnpj={cnpj} />
+            <h2 style={{ marginTop: 12 }}>Outros proxies (faixas de atraso e fluxos)</h2>
             <p className="sub" style={{ margin: 0 }}>
               O informe da CVM não traz dados por safra de originação. Estes indicadores aproximam o comportamento
               de safra a partir das faixas de atraso (Tab. V/VI) e das compras/recompras do mês (Tab. VII). Ver definição de cada um passando o mouse nos indicadores.
@@ -135,36 +166,6 @@ export default function Fundo() {
                 series={[{ key: 'roll_60_90', label: 'Fundo' }, { key: 'setor_roll_60_90', label: 'Mediana da categoria', dashed: true, color: 'var(--muted)' }]} />
             </div>
           </div>
-        )}
-        {tab === 'comp' && (
-          <table className="simple">
-            <thead><tr><th>Indicador</th><th className="r">Fundo</th><th className="r">P25</th><th className="r">Mediana</th>
-              <th className="r">P75</th><th>Posição na categoria</th><th className="r">n</th></tr></thead>
-            <tbody>
-              {lam.data.comparativo.map((c) => {
-                const f = dic?.[c.metrica]?.fmt
-                const pos = c.percentil == null || c.valor == null ? null
-                  : c.maior_melhor === false ? 1 - c.percentil : c.percentil
-                return (
-                  <tr key={c.metrica} title={dic?.[c.metrica]?.desc}>
-                    <td>{colLabel(dic, c.metrica)}</td>
-                    <td className="r"><b>{fmtValue(c.valor, f)}</b></td>
-                    <td className="r">{fmtValue(c.p25, f)}</td><td className="r">{fmtValue(c.mediana, f)}</td>
-                    <td className="r">{fmtValue(c.p75, f)}</td>
-                    <td>{pos == null ? '–' : (
-                      <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-                        <div className="bar-bg" style={{ flex: 1 }}><div className="bar-fg" style={{ width: `${pos * 100}%` }} /></div>
-                        <span className="muted num" style={{ width: 90 }}>
-                          {c.maior_melhor == null ? `percentil ${Math.round(c.percentil * 100)}` : `melhor que ${Math.round(pos * 100)}%`}
-                        </span>
-                      </div>)}
-                    </td>
-                    <td className="r muted">{c.n}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
         )}
         {tab === 'carteira' && (
           <div className="grid2">

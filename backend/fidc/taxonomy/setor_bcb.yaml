@@ -1,0 +1,63 @@
+# Séries do Banco Central (SGS) usadas como referência de mercado por categoria.
+# Códigos validados na API em 05/10/2026 (nome oficial conferido no SGS/CKAN).
+# Para adicionar: inclua a série em `series` e o código na lista da categoria.
+# Unidades: saldo e concessões em R$ milhões; taxa em % a.a.; inadimplência em % da carteira (> 90 dias).
+
+series:
+  # consignado
+  20576: {nome: "Consignado setor privado - saldo", unidade: "R$ mi", metrica: saldo}
+  20744: {nome: "Consignado setor privado - taxa média", unidade: "% a.a.", metrica: taxa}
+  21116: {nome: "Consignado setor privado - inadimplência", unidade: "%", metrica: inadimplencia}
+  20668: {nome: "Consignado setor privado - concessões", unidade: "R$ mi", metrica: concessoes}
+  20577: {nome: "Consignado setor público - saldo", unidade: "R$ mi", metrica: saldo}
+  20745: {nome: "Consignado setor público - taxa média", unidade: "% a.a.", metrica: taxa}
+  21117: {nome: "Consignado setor público - inadimplência", unidade: "%", metrica: inadimplencia}
+  20669: {nome: "Consignado setor público - concessões", unidade: "R$ mi", metrica: concessoes}
+  20578: {nome: "Consignado INSS - saldo", unidade: "R$ mi", metrica: saldo}
+  20746: {nome: "Consignado INSS - taxa média", unidade: "% a.a.", metrica: taxa}
+  21118: {nome: "Consignado INSS - inadimplência", unidade: "%", metrica: inadimplencia}
+  20670: {nome: "Consignado INSS - concessões", unidade: "R$ mi", metrica: concessoes}
+  20579: {nome: "Consignado total - saldo", unidade: "R$ mi", metrica: saldo}
+  20747: {nome: "Consignado total - taxa média", unidade: "% a.a.", metrica: taxa}
+  21119: {nome: "Consignado total - inadimplência", unidade: "%", metrica: inadimplencia}
+  20671: {nome: "Consignado total - concessões", unidade: "R$ mi", metrica: concessoes}
+  # PF outros
+  20574: {nome: "Crédito pessoal não consignado - saldo", unidade: "R$ mi", metrica: saldo}
+  20742: {nome: "Crédito pessoal não consignado - taxa média", unidade: "% a.a.", metrica: taxa}
+  21114: {nome: "Crédito pessoal não consignado - inadimplência", unidade: "%", metrica: inadimplencia}
+  20666: {nome: "Crédito pessoal não consignado - concessões", unidade: "R$ mi", metrica: concessoes}
+  20581: {nome: "Veículos PF - saldo", unidade: "R$ mi", metrica: saldo}
+  20749: {nome: "Veículos PF - taxa média", unidade: "% a.a.", metrica: taxa}
+  21121: {nome: "Veículos PF - inadimplência", unidade: "%", metrica: inadimplencia}
+  20673: {nome: "Veículos PF - concessões", unidade: "R$ mi", metrica: concessoes}
+  20590: {nome: "Cartão de crédito PF - saldo", unidade: "R$ mi", metrica: saldo}
+  22024: {nome: "Cartão de crédito PF - taxa média", unidade: "% a.a.", metrica: taxa}
+  21129: {nome: "Cartão de crédito PF - inadimplência", unidade: "%", metrica: inadimplencia}
+  20682: {nome: "Cartão de crédito PF - concessões", unidade: "R$ mi", metrica: concessoes}
+  # PJ
+  20544: {nome: "Desconto de duplicatas e recebíveis PJ - saldo", unidade: "R$ mi", metrica: saldo}
+  20719: {nome: "Desconto de duplicatas e recebíveis PJ - taxa média", unidade: "% a.a.", metrica: taxa}
+  21087: {nome: "Desconto de duplicatas e recebíveis PJ - inadimplência", unidade: "%", metrica: inadimplencia}
+  20636: {nome: "Desconto de duplicatas e recebíveis PJ - concessões", unidade: "R$ mi", metrica: concessoes}
+  20550: {nome: "Capital de giro PJ - saldo", unidade: "R$ mi", metrica: saldo}
+  20725: {nome: "Capital de giro PJ - taxa média", unidade: "% a.a.", metrica: taxa}
+  21093: {nome: "Capital de giro PJ - inadimplência", unidade: "%", metrica: inadimplencia}
+  20642: {nome: "Capital de giro PJ - concessões", unidade: "R$ mi", metrica: concessoes}
+  # macro
+  21083: {nome: "Inadimplência PJ - total SFN", unidade: "%", metrica: inadimplencia}
+  21084: {nome: "Inadimplência PF - total SFN", unidade: "%", metrica: inadimplencia}
+  4391: {nome: "CDI acumulado no mês", unidade: "% a.m.", metrica: cdi}
+
+categorias:
+  consignado_privado: [20576, 20744, 21116, 20668]
+  consignado_publico: [20577, 20745, 21117, 20669, 20578, 20746, 21118, 20670]
+  consignado_indefinido: [20579, 20747, 21119, 20671]
+  credito_pessoal: [20574, 20742, 21114, 20666]
+  fgts: [20574, 20742, 21114, 20666]
+  veiculos: [20581, 20749, 21121, 20673]
+  cartao: [20590, 22024, 21129, 20682]
+  multicedente_multissacado: [20544, 20719, 21087, 20636, 21083]
+  monocedente_comercial: [20544, 20719, 21087, 20636, 21083]
+  recebiveis_comerciais_outros: [20544, 20719, 21087, 20636, 21083]
+  risco_sacado: [20544, 20719, 21087, 20636, 21083]
+  corporativo: [20550, 20725, 21093, 20642, 21083]

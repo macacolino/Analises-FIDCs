@@ -1,0 +1,143 @@
+# Roteiros de due diligence por categoria + parâmetros manuais (o que o informe CVM não traz).
+#
+# fonte: informe (o app calcula sozinho - campo `metrica` aponta o indicador), regulamento, gestor, rating, externo
+# Respostas ficam salvas por fundo (aba "Roteiro de DD" na lâmina).
+# Para criar roteiro novo: adicione uma chave em `roteiros` e liste as categorias em `aplica_a`.
+
+parametros:
+  # chave: [rótulo, formato, fonte típica, usado em]
+  sub_min_senior:        ["Subordinação mínima da sênior (% PL)", pct, regulamento, "M24 folga; RF08"]
+  jr_min_pl:             ["Jr mínima (% PL)", pct, regulamento, "RF08-Jr; M01/M02 com Jr no mínimo"]
+  limite_maior_cedente:  ["Limite do maior cedente (% PL)", pct, regulamento, "M03"]
+  limite_5_cedentes:     ["Limite dos 5 maiores cedentes (% PL)", pct, regulamento, "M03"]
+  limite_maior_sacado:   ["Limite do maior sacado (% PL)", pct, regulamento, "M04"]
+  limite_5_sacados:      ["Limite dos 5 maiores sacados (% PL)", pct, regulamento, "M04"]
+  responsabilidade_limitada: ["Responsabilidade limitada (S/N)", txt, regulamento, "RF21 (trava)"]
+  prazo_resgate_dias:    ["Prazo de resgate Sr/Mz (dias)", num, regulamento, "Casamento ativo x passivo"]
+  spread_senior:         ["Spread da sênior (CDI + % a.a.)", pct, suplemento, "M18 custo de alavancagem"]
+  spread_mezanino:       ["Spread da mezanino (CDI + % a.a.)", pct, suplemento, "M18"]
+  taxa_cessao_am:        ["Taxa média de cessão - gestor (% a.m.)", pct, gestor, "M22; stress"]
+  gatilho_f30_pl:        ["Gatilho de evento: vencidos > 30 d / PL", pct, regulamento, "Distância até gatilho"]
+  rating:                ["Rating (agência, nota, data)", txt, rating, "Status do rating"]
+  liquidacao_sacado_pct: ["% liquidação normal pelo sacado", pct, gestor, "M07"]
+  maior_sacado_pl:       ["Maior sacado / PL", pct, gestor, "M10"]
+  cinco_sacados_pl:      ["5 maiores sacados / PL", pct, gestor, "M11"]
+  # consignado privado (relatório do gestor / fita)
+  pct_direto:            ["% originação direta (leilão direto)", pct, gestor, "Consignado privado"]
+  pct_indireto:          ["% originação indireta (correspondente)", pct, gestor, "Consignado privado"]
+  pct_portabilidade:     ["% portabilidade (saída) no mês", pct, gestor, "Consignado privado"]
+  fpd60:                 ["FPD 60 da última safra", pct, gestor, "Consignado privado"]
+  over90_safra:          ["Over 90 da safra (fita)", pct, gestor, "Consignado privado"]
+  pct_ate_2sm:           ["% devedores com renda até 2 salários mínimos", pct, gestor, "Consignado privado"]
+  pct_inad_fraude:       ["% da inadimplência que é fraude (vs operacional)", pct, gestor, "Consignado privado"]
+  indice_escrituracao:   ["Índice de escrituração / averbação", pct, gestor, "Consignado privado"]
+  margem_utilizada:      ["% da margem consignável utilizada", pct, gestor, "Consignado privado"]
+  taxa_originacao_am:    ["Taxa média de originação (% a.m.)", pct, gestor, "Consignado privado"]
+  taxa_cedida_am:        ["Taxa cedida ao fundo, líquida (% a.m.)", pct, gestor, "Consignado privado"]
+  prazo_medio_originacao: ["Prazo médio da originação (meses)", num, gestor, "Consignado privado"]
+  originacao_mensal:     ["Originação mensal (R$)", brl, gestor, "Consignado privado"]
+  pct_empresas_menos_20: ["% carteira em empresas com < 20 funcionários", pct, gestor, "Clusters"]
+  pct_empresas_ate_1ano: ["% carteira em empresas com até 1 ano", pct, gestor, "Clusters"]
+  pct_tempo_casa_12m:    ["% devedores com < 12 meses de casa", pct, gestor, "Clusters"]
+
+roteiros:
+  consignado_privado:
+    nome: "Consignado privado"
+    aplica_a: [consignado_privado, consignado_indefinido]
+    blocos:
+      - nome: "Mercado e regulatório"
+        itens:
+          - {id: cp_mkt_inad, pergunta: "Inadimplência do consignado privado no SFN (BCB 21116) e tendência", fonte: externo, metrica: bcb:21116}
+          - {id: cp_mkt_saldo, pergunta: "Saldo e concessões do mercado (BCB 20576 / 20668) - fase do ciclo", fonte: externo, metrica: bcb:20576}
+          - {id: cp_mkt_taxa, pergunta: "Taxa média do mercado (BCB 20744) vs teto e vs taxa do originador", fonte: externo, metrica: bcb:20744}
+          - {id: cp_reg_revinculo, pergunta: "Revínculo (Lei 15.179/2025): como o originador trata parcelas vencidas e a fila temporal", fonte: gestor}
+          - {id: cp_reg_margem, pergunta: "Recalculo mensal da margem: exposição a remuneração variável e superendividamento", fonte: gestor}
+          - {id: cp_reg_portab, pergunta: "Portabilidade pelo app (Dataprev): impacto em ágio pago e pré-pagamento", fonte: gestor}
+          - {id: cp_reg_operacional, pergunta: "Risco operacional do empregador (desconto não feito / não repassado) e atuação do MTE", fonte: gestor}
+      - nome: "Originador"
+        itens:
+          - {id: cp_orig_cluster, pergunta: "Clusters-alvo (porte, faturamento, tempo de empresa, tempo de casa, renda) e por que ele tem capacidade", fonte: gestor}
+          - {id: cp_orig_direto, pergunta: "% originação direta vs indireta (total e nas safras novas)", fonte: gestor, metrica: param:pct_direto}
+          - {id: cp_orig_track, pergunta: "Track record, retenção do cliente e projeção de originação", fonte: gestor}
+          - {id: cp_orig_cobranca, pergunta: "Como funciona a cobrança e a conformidade com as normas", fonte: gestor}
+          - {id: cp_orig_alinhamento, pergunta: "Alinhamento: originador na subordinada júnior? Remuneração e ágio", fonte: regulamento}
+      - nome: "Regulamento"
+        itens:
+          - {id: cp_reg_agio, pergunta: "Ágio máximo pelo regulamento; quem arca com o ágio; custos adicionais na cessão", fonte: regulamento}
+          - {id: cp_reg_jr, pergunta: "Regra de amortização da Jr; amortização das demais cotas sequencial ou pari passu", fonte: regulamento}
+          - {id: cp_reg_prazo, pergunta: "Prazo de investimento e regras de desinvestimento", fonte: regulamento}
+          - {id: cp_reg_clawback, pergunta: "Clawback em caso de pré-pagamento?", fonte: regulamento}
+          - {id: cp_reg_prestadores, pergunta: "Remuneração e alinhamento dos prestadores essenciais", fonte: regulamento}
+          - {id: cp_reg_politica, pergunta: "Política de crédito e cobrança no regulamento", fonte: regulamento}
+          - {id: cp_reg_eventos, pergunta: "Eventos de avaliação e regra para evento de liquidação", fonte: regulamento}
+      - nome: "Carteira (validar com o informe)"
+        itens:
+          - {id: cp_cart_inad, pergunta: "Over 90 / carteira vs mediana da categoria", fonte: informe, metrica: over90_carteira}
+          - {id: cp_cart_safra, pergunta: "Safras: F30/F60/F180 por mês de vencimento (proxy) vs fita do gestor", fonte: informe, metrica: m17_f30_media}
+          - {id: cp_cart_roll, pergunta: "Roll rates 1-30→31-60 e 31-60→61-90", fonte: informe, metrica: roll_30_60}
+          - {id: cp_cart_recompra, pergunta: "Recompras e substituições pelo cedente (mascaramento)", fonte: informe, metrica: m05_recompra_carteira}
+          - {id: cp_cart_taxa, pergunta: "Taxa média de aquisição (Tab. IX) vs taxa declarada", fonte: informe, metrica: m22_taxa_ix_aa}
+          - {id: cp_cart_pmr, pergunta: "Prazo médio da carteira (PMR)", fonte: informe, metrica: m23_pmr}
+          - {id: cp_cart_jr, pergunta: "Rentabilidade da sub júnior e excesso de spread", fonte: informe, metrica: m19_excesso_spread}
+          - {id: cp_cart_fraude, pergunta: "% da inadimplência que é fraude x operacional", fonte: gestor, metrica: param:pct_inad_fraude}
+          - {id: cp_cart_fpd, pergunta: "FPD 60 por safra", fonte: gestor, metrica: param:fpd60}
+          - {id: cp_cart_portab, pergunta: "% portabilidade", fonte: gestor, metrica: param:pct_portabilidade}
+          - {id: cp_cart_renda, pergunta: "% devedores com renda até 2 salários mínimos", fonte: gestor, metrica: param:pct_ate_2sm}
+          - {id: cp_cart_margem, pergunta: "% da margem consignável utilizada", fonte: gestor, metrica: param:margem_utilizada}
+      - nome: "Acompanhamento"
+        itens:
+          - {id: cp_acomp_stress, pergunta: "Stress test com os dados do mês (perda limiar vs custo de crédito)", fonte: informe, metrica: m16_custo_credito}
+          - {id: cp_acomp_matriz, pergunta: "Matriz de riscos atualizada (pontos positivos x negativos vs mercado)", fonte: gestor}
+          - {id: cp_acomp_bp, pergunta: "Validação do business plan: crescimento da casa e do FIDC, exposição a outras teses", fonte: gestor}
+
+  mcms:
+    nome: "Multicedente multissacado (comitê MCMS)"
+    aplica_a: [multicedente_multissacado, recebiveis_comerciais_outros, monocedente_comercial, risco_sacado]
+    blocos:
+      - nome: "Colchão e estrutura"
+        itens:
+          - {id: mc_sub_min, pergunta: "Subordinação mínima (Sr e Jr) e folga atual", fonte: regulamento, metrica: param:sub_min_senior}
+          - {id: mc_jr_pdd, pergunta: "Jr ÷ PDD média 12m e Jr ÷ vencidos até 360 d", fonte: informe, metrica: m01_jr_pdd}
+          - {id: mc_lim_ced, pergunta: "Jr ÷ limite dos 5 maiores cedentes e sacados", fonte: regulamento, metrica: param:limite_5_cedentes}
+          - {id: mc_resg_excesso, pergunta: "Resgate de excesso da Jr avisa os demais cotistas?", fonte: regulamento}
+          - {id: mc_resp_lim, pergunta: "Responsabilidade limitada (RF21 - trava)", fonte: regulamento, metrica: param:responsabilidade_limitada}
+      - nome: "Perdas e carteira"
+        itens:
+          - {id: mc_recompra, pergunta: "Recompra média e preço vs contábil (RF01, RF19)", fonte: informe, metrica: m06_preco_recompra}
+          - {id: mc_liq_sacado, pergunta: "% liquidação normal pelo sacado", fonte: gestor, metrica: param:liquidacao_sacado_pct}
+          - {id: mc_custo, pergunta: "Custo de crédito 12m", fonte: informe, metrica: m16_custo_credito}
+          - {id: mc_safras, pergunta: "Safras F30/F60/F180", fonte: informe, metrica: m17_f180_media}
+      - nome: "Concentração e lastro"
+        itens:
+          - {id: mc_conc_ced, pergunta: "Maior cedente e 5 maiores / PL", fonte: informe, metrica: top1_cedente_pct}
+          - {id: mc_conc_sac, pergunta: "Maior sacado e 5 maiores / PL", fonte: gestor, metrica: param:maior_sacado_pl}
+          - {id: mc_lastro, pergunta: "Verificação de lastro: amostral? registradora? confirmação com o sacado? (RF05)", fonte: gestor}
+          - {id: mc_grupo, pergunta: "Grupo econômico oculto / cedentes dependentes do mesmo sacado (RF07)", fonte: gestor}
+      - nome: "Retorno e spread"
+        itens:
+          - {id: mc_spread, pergunta: "Excesso de spread observado e custo de alavancagem", fonte: informe, metrica: m19_excesso_spread}
+          - {id: mc_taxa, pergunta: "Taxa de cessão do gestor vs Tab. IX vs receita implícita", fonte: gestor, metrica: param:taxa_cessao_am}
+      - nome: "Governança"
+        itens:
+          - {id: mc_consultoria, pergunta: "Consultoria acumulando originação, cobrança e lastro (RF12); remuneração (RF13, RF22)", fonte: regulamento}
+          - {id: mc_gatilhos, pergunta: "Gatilhos de evento de avaliação/liquidação e distância atual (RF11)", fonte: regulamento, metrica: param:gatilho_f30_pl}
+          - {id: mc_troca, pergunta: "Troca de gestor ou consultoria nos últimos 12m (RF25)", fonte: externo}
+
+  geral:
+    nome: "Roteiro geral"
+    aplica_a: ["*"]
+    blocos:
+      - nome: "Estrutura"
+        itens:
+          - {id: g_sub, pergunta: "Subordinação mínima e folga", fonte: regulamento, metrica: param:sub_min_senior}
+          - {id: g_resp, pergunta: "Responsabilidade limitada", fonte: regulamento, metrica: param:responsabilidade_limitada}
+          - {id: g_eventos, pergunta: "Eventos de avaliação e liquidação", fonte: regulamento}
+      - nome: "Carteira"
+        itens:
+          - {id: g_inad, pergunta: "Inadimplência e PDD vs categoria", fonte: informe, metrica: over90_carteira}
+          - {id: g_conc, pergunta: "Concentração de cedentes", fonte: informe, metrica: top1_cedente_pct}
+          - {id: g_spread, pergunta: "Excesso de spread e retorno da Jr", fonte: informe, metrica: m19_excesso_spread}
+      - nome: "Prestadores"
+        itens:
+          - {id: g_track, pergunta: "Track record do gestor e originador", fonte: externo}
+          - {id: g_rating, pergunta: "Rating vigente e data", fonte: rating, metrica: param:rating}

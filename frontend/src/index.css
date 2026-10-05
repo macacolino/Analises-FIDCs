@@ -112,3 +112,14 @@ table.simple td.r, table.simple th.r { text-align: right; font-variant-numeric: 
 .chart-tip .t { font-weight: 600; margin-bottom: 4px; }
 .err { color: var(--critical); }
 .loading { color: var(--muted); padding: 24px; }
+.pick:hover { background: var(--surface-2); }
+details > summary { list-style: revert; }
+.chip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 4px 3px 10px; border-radius: 99px;
+  background: var(--surface-2); border: 1px solid var(--border); font-size: 12px; }
+.chip button { border: none; background: none; padding: 0 6px; }
+.best { color: var(--good-ink); font-weight: 600; }
+.worst { color: var(--critical); font-weight: 600; }
+.sev-erro { color: var(--critical); font-weight: 600; }
+.sev-alerta { color: var(--ink); }
+.qbadge { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface-2); }
+.qbadge .dot { width: 8px; height: 8px; border-radius: 4px; }

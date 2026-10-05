@@ -1,0 +1,29 @@
+# Grupos de pares carregados na primeira subida do app (não sobrescreve grupos já existentes).
+# Origem: Base_MCMS_2026-08 (pares MCMS de ago/26, decisões de inclusão do analista).
+
+grupos:
+  - nome: "Pares MCMS"
+    descricao: "FIDCs multicedente/multissacado de recebíveis comerciais - benchmark do comitê (Base MCMS ago/26). A regra uma gestora = um fundo já está aplicada na seleção (incluir = true)."
+    uma_por_gestora: false
+    membros:
+      - {cnpj: "24504464000101", nome: "IOX II", incluir: true, motivo: "Par MCMS"}
+      - {cnpj: "23216398000101", nome: "Multiplica", incluir: false, motivo: "Não passa no teste MCMS ou gestora já representada"}
+      - {cnpj: "29469420000101", nome: "Multiplike", incluir: false, motivo: "Não passa no teste MCMS ou gestora já representada"}
+      - {cnpj: "14051028000162", nome: "SRM (Exodus Institucional)", incluir: false, motivo: "Não passa no teste MCMS ou gestora já representada"}
+      - {cnpj: "17250006000110", nome: "RED Real LP", incluir: false, motivo: "Não passa no teste MCMS ou gestora já representada"}
+      - {cnpj: "42700626000150", nome: "Stars Bank", incluir: true, motivo: "Par MCMS"}
+      - {cnpj: "29957532000101", nome: "Sabiá Credit (SB Crédito)", incluir: true, motivo: "Par MCMS"}
+      - {cnpj: "20057764000120", nome: "Harpia", incluir: true, motivo: "Par MCMS"}
+      - {cnpj: "26558785000106", nome: "Unique", incluir: true, motivo: "Par MCMS"}
+      - {cnpj: "14166140000149", nome: "Sifra Star", incluir: true, motivo: "Par MCMS"}
+      - {cnpj: "40155056000130", nome: "Tera Performance", incluir: false, motivo: "Não passa no teste MCMS ou gestora já representada"}
+      - {cnpj: "40753151000135", nome: "JP Capital", incluir: true, motivo: "Par MCMS"}
+      - {cnpj: "44002535000177", nome: "Bex", incluir: true, motivo: "Par MCMS"}
+      - {cnpj: "41649912000176", nome: "Olam", incluir: false, motivo: "Não passa no teste MCMS ou gestora já representada"}
+      - {cnpj: "26690689000117", nome: "Continentalbanco NP", incluir: false, motivo: "Não passa no teste MCMS ou gestora já representada"}
+      - {cnpj: "12167116000107", nome: "Via Invest", incluir: false, motivo: "Não passa no teste MCMS ou gestora já representada"}
+      - {cnpj: "23200289000198", nome: "CF FIDC (Invista)", incluir: false, motivo: "Não passa no teste MCMS ou gestora já representada"}
+      - {cnpj: "14605855000150", nome: "Del Monte", incluir: true, motivo: "Par MCMS"}
+      - {cnpj: "11468186000124", nome: "Atlanta (Athena)", incluir: false, motivo: "Não passa no teste MCMS ou gestora já representada"}
+      - {cnpj: "08632394000102", nome: "RED Multisetorial LP", incluir: true, motivo: "Par MCMS"}
+      - {cnpj: "22175405000101", nome: "MR FIDC", incluir: false, motivo: "Base interna (fundo analisado)"}
