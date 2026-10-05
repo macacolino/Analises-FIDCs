@@ -1,0 +1,17 @@
+{
+  // Ambiente para rodar o Analisador de FIDCs no GitHub Codespaces (só navegador, nada instalado no PC)
+  "name": "Analisador de FIDCs",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  // 1a vez: instala dependências, monta as telas e baixa os dados da CVM (~5 min)
+  "postCreateCommand": "pip install -r backend/requirements.txt && cd frontend && npm ci && npm run build && cd ../backend && python -m fidc.etl",
+  // toda vez que o codespace liga: sobe o app na porta 8000
+  "postStartCommand": "bash .devcontainer/start.sh",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": { "label": "Analisador de FIDCs", "onAutoForward": "openBrowser" }
+  },
+  "hostRequirements": { "cpus": 2 }
+}
