@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 
 DIR = config.DATA_DIR / "regulamentos"
 DB = config.DATA_DIR / "regulamentos.sqlite"
-GLIFOS_SEED = Path(__file__).parent / "taxonomy" / "glifos_calibri.json"
+GLIFOS_SEED = Path(__file__).parent / "seed" / "glifos.json"
 GLIFOS = DIR / "glifos_aprendidos.json"
 SEED = Path(__file__).parent / "seed" / "regulamentos.json.gz"   # resultado versionado no repositório (sem os textos)
 DOWNLOAD = f"{config.FNET_BASE}/downloadDocumento?id={{}}"
@@ -138,7 +138,10 @@ _glifos_lock = threading.Lock()
 def _familia(font) -> str:
     nome = str(font.get("/BaseFont", ""))
     nome = nome.split("+", 1)[-1].lstrip("/")
-    return nome.split(",")[0].split("-")[0]   # Calibri-Bold -> Calibri (mesma ordem de glifos)
+    return nome.replace(",", "-")   # Calibri e Calibri-Bold têm ordens de glifos diferentes
+
+
+_GENERICA = re.compile(r"^(F\d+|CIDFont.*|Untitled|.*\.tmp|___.*)$")
 
 
 def _aprender(font) -> None:
@@ -148,6 +151,8 @@ def _aprender(font) -> None:
     except Exception:  # noqa: BLE001
         return
     fam = _familia(font)
+    if _GENERICA.match(fam):   # nome genérico ("F1"): fontes diferentes, ordem de glifos diferente
+        return
     m = {}
     for blk in re.findall(r"beginbfchar(.*?)endbfchar", data, re.S):
         for cid, uni in re.findall(r"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>", blk):
@@ -191,7 +196,8 @@ def extrair_texto(pdf: bytes) -> tuple[list[str], str]:
                 if "/ToUnicode" in font:
                     _aprender(font)
                 else:
-                    mapa = _glifos.get(_familia(font))
+                    fam = _familia(font)
+                    mapa = None if _GENERICA.match(fam) else _glifos.get(fam)
                     if mapa:
                         text = "".join(mapa.get(ord(c), c) for c in text)
                         usou_mapa = True
@@ -535,7 +541,12 @@ def exportar_seed() -> Path:
     SEED.write_bytes(gzip.compress(json.dumps(data, ensure_ascii=False).encode(), 9))
     if _glifos_novos or GLIFOS.exists():
         salvar_glifos()
-        GLIFOS_SEED.write_text(GLIFOS.read_text())
+        uteis = {}
+        for fam, m in json.loads(GLIFOS.read_text()).items():   # sem mapeamento identidade e nomes genéricos
+            m = {k: v for k, v in m.items() if int(k) >= 0x110000 or chr(int(k)) != v} if not _GENERICA.match(fam) else {}
+            if m:
+                uteis[fam] = m
+        GLIFOS_SEED.write_text(json.dumps(uteis, ensure_ascii=False))
     return SEED
 
 

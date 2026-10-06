@@ -198,8 +198,9 @@ def del_param(cnpj: str, chave: str, competencia: str = ""):
 
 def _campos_extraidos(cnpj: str) -> list[dict]:
     try:
-        return df("""SELECT campo, valor_num, valor_txt, trecho, pagina, confianca FROM regulamento_campo
-                     WHERE cnpj = ?""", [consultas.cnpj_digits(cnpj)]).to_dict("records")
+        return df("""SELECT c.campo, c.valor_num, c.valor_txt, c.trecho, c.pagina, c.confianca, r.data_entrega
+                     FROM regulamento_campo c JOIN regulamento r USING (cnpj) WHERE c.cnpj = ?""",
+                  [consultas.cnpj_digits(cnpj)]).to_dict("records")
     except Exception:  # noqa: BLE001 - base sem a tabela
         return []
 
@@ -214,7 +215,7 @@ def _param_atual(cnpj: str) -> dict[str, dict]:
             pg = c["pagina"]
             out[c["campo"]] = {"chave": c["campo"], "valor_num": c["valor_num"], "valor_txt": c["valor_txt"],
                                "fonte": "regulamento (extração automática" + (f", p. {int(pg)})" if pd.notna(pg) else ")"),
-                               "auto": True}
+                               "data_base": (c.get("data_entrega") or "")[:10] or None, "auto": True}
     return out
 
 
@@ -333,7 +334,7 @@ def roteiro(cnpj: str):
                     if p:
                         fmt_p = (pcat.get(m[6:]) or [None, "txt"])[1]
                         auto = {"valor": p["valor_num"] if p["valor_num"] is not None else p["valor_txt"],
-                                "fmt": "num" if fmt_p == "txt" else fmt_p, "fonte": p["fonte"], "data_base": p["data_base"]}
+                                "fmt": "num" if fmt_p == "txt" else fmt_p, "fonte": p["fonte"], "data_base": p.get("data_base")}
                 elif m and m.startswith("bcb:"):
                     code = int(m[4:])
                     if code not in bcb:

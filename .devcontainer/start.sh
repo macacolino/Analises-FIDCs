@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")/.."
 mkdir -p data
 
-hash_of() { find "$@" -type f \( -name '*.py' -o -name '*.yaml' -o -name '*.ts' -o -name '*.tsx' -o -name '*.css' -o -name '*.json' -o -name '*.txt' -o -name '*.html' \) \
+hash_of() { find "$@" -type f \( -name '*.py' -o -name '*.yaml' -o -name '*.ts' -o -name '*.tsx' -o -name '*.css' -o -name '*.json' -o -name '*.gz' -o -name '*.txt' -o -name '*.html' \) \
   -not -path '*/node_modules/*' -not -path '*/__pycache__/*' -print0 | sort -z | xargs -0 cat | md5sum | cut -d' ' -f1; }
 
 echo "==> 1/4 Dependências Python"

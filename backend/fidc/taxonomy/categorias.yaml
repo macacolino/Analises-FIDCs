@@ -99,7 +99,7 @@ categorias:
         reg_maior: {consig_privado: [consig_inss, consig_servidor]}
       # fora do segmento consignado da Tab. II: só com o regulamento claramente de consignado privado
       - reg_min: {consignado: 10, consig_privado: 10}
-        reg_maior: {consig_privado: [consig_inss, consig_servidor], consignado: [fgts]}
+        reg_maior: {consig_privado: [consig_inss, consig_servidor], consignado: [fgts, veiculo]}
         revisar: true
 
   - id: consignado_publico_reg
@@ -111,7 +111,7 @@ categorias:
         reg_min: {consignado: 3, consig_inss+consig_servidor: 3}
         reg_maior: {consig_inss+consig_servidor: [consig_privado]}
       - reg_min: {consignado: 10, consig_inss+consig_servidor: 10}
-        reg_maior: {consig_inss+consig_servidor: [consig_privado], consignado: [fgts]}
+        reg_maior: {consig_inss+consig_servidor: [consig_privado], consignado: [fgts, veiculo]}
         revisar: true
 
   # segmento consignado na Tab. II mas o regulamento não fala de consignado: provável erro de enquadramento
