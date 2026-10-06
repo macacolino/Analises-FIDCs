@@ -228,7 +228,7 @@ SINAIS = {
     # Lei 10.820/2003 cobre CLT e também aposentados do INSS (art. 6º): fica num sinal neutro
     "lei_10820": r"10\.820",
     "consig_privado": r"setor privado|trabalhador\w* (do setor privado|celetist)|\bclt\b|esocial|e-?social|"
-                      r"credito do trabalhador|15\.179|1\.292|empregador(?:es|as?)?\b(?! rural)|carteira de trabalho",
+                      r"credito do trabalhador|15\.179|1\.292|empresas privadas|empregador(?:es|as?)?\b(?! rural)|carteira de trabalho",
     "dataprev": r"dataprev", "fgts": r"\bfgts\b|saque.aniversario",
     # outros lastros
     "precatorio": r"precatori", "duplicata": r"duplicata", "cheque": r"\bcheques?\b", "ccb": r"\bccb\b|cedulas? de credito bancario",
@@ -538,6 +538,13 @@ def exportar_seed() -> Path:
     SEED.parent.mkdir(parents=True, exist_ok=True)
     data = {k: {"cols": list(v.columns), "rows": v.astype(object).where(v.notna(), None).values.tolist()}
             for k, v in t.items()}
+    con = sqlite3.connect(DB)
+    try:
+        cur = con.execute("SELECT cnpj, doc_id, modelo, resultado, processado_em, origem FROM reg_ia")
+        data["reg_ia"] = {"cols": [c[0] for c in cur.description], "rows": [list(r) for r in cur]}
+    except sqlite3.OperationalError:
+        pass
+    con.close()
     SEED.write_bytes(gzip.compress(json.dumps(data, ensure_ascii=False).encode(), 9))
     if _glifos_novos or GLIFOS.exists():
         salvar_glifos()

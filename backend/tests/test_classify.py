@@ -98,3 +98,23 @@ def test_override_manual_ganha():
     out = classify.classify_frame(df, CATS, overrides={"1".zfill(14): "consignado_publico"})
     assert out.loc[0, "categoria"] == "consignado_publico"
     assert out.loc[0, "origem"] == "manual"
+
+
+def _ia(nome="FIDC XPTO", seg=None, **ia):
+    f = feat(nome=nome, **(seg or {"F8": 1.0}))
+    f.update({f"ia_{k}": v for k, v in ia.items()})
+    c = classify.classify_one(f, CATS)[0]
+    return c.alias_de or c.id
+
+
+def test_ia_classifica_consignado_e_tese():
+    # F3 Falcon: "financeiro - outros" no informe, regulamento de consignado privado (Lei 15.179)
+    assert _ia(tese="consignado", consignado="privado_clt", confianca="alta") == "consignado_privado"
+    assert _ia(tese="consignado", consignado="inss", confianca="media") == "consignado_publico"
+    # segmento consignado no informe, mas o regulamento é de crédito pessoal
+    assert _ia(seg={"F2": 1.0}, tese="credito_pessoal", consignado="nao_e_consignado", confianca="alta") == "credito_pessoal"
+    # financeiro-outros: vale a tese da IA; com confiança baixa, não
+    assert _ia(tese="cartao", consignado="nao_e_consignado", confianca="alta") == "cartao"
+    assert _ia(tese="cartao", consignado="nao_e_consignado", confianca="baixa") == "financeiro_outros"
+    # nome explícito continua ganhando
+    assert _ia(nome="CAJU CONSIGNADO PRIVADO FIDC", tese="consignado", consignado="inss", confianca="alta") == "consignado_privado"

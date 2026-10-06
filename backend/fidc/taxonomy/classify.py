@@ -46,6 +46,9 @@ class Regra:
     reg_max: dict[str, int] = field(default_factory=dict)
     reg_maior: list[tuple[str, list[str]]] = field(default_factory=list)
     com_regulamento: bool = False
+    ia_consignado: list[str] = field(default_factory=list)
+    ia_tese: list[str] = field(default_factory=list)
+    ia_confianca_min: str | None = None
     revisar: bool = False
 
     @classmethod
@@ -67,6 +70,8 @@ class Regra:
             reg_min=dict(d.get("reg_min") or {}), reg_max=dict(d.get("reg_max") or {}),
             reg_maior=[(a, [b] if isinstance(b, str) else list(b)) for a, b in (d.get("reg_maior") or {}).items()],
             com_regulamento=bool(d.get("com_regulamento", False)),
+            ia_consignado=list(d.get("ia_consignado") or []), ia_tese=list(d.get("ia_tese") or []),
+            ia_confianca_min=d.get("ia_confianca_min"),
             revisar=bool(d.get("revisar", False)),
         )
 
@@ -100,6 +105,16 @@ class Regra:
             v = f.get(campo)
             if v is None or pd.isna(v) or (v < lim if maior else v > lim):
                 return False
+        if self.ia_consignado or self.ia_tese or self.ia_confianca_min:
+            if not f.get("ia_tese"):   # sem leitura por IA
+                return False
+            if self.ia_consignado and f.get("ia_consignado") not in self.ia_consignado:
+                return False
+            if self.ia_tese and f.get("ia_tese") not in self.ia_tese:
+                return False
+            ordem = {"baixa": 0, "media": 1, "alta": 2}
+            if self.ia_confianca_min and ordem.get(f.get("ia_confianca"), -1) < ordem[self.ia_confianca_min]:
+                return False
         if self.reg_min or self.reg_max or self.reg_maior or self.com_regulamento:
             tem = bool(f.get("tem_reg"))
             if (self.reg_min or self.reg_maior or self.com_regulamento) and not tem:
@@ -123,6 +138,7 @@ class Categoria:
     grupo: str
     regras: list[Regra]
     alias_de: str | None = None   # bloco de regras extra que classifica numa categoria já existente
+    usar_tese_ia: bool = False    # a categoria final é a tese lida pela IA (quando ela é uma categoria válida)
 
 
 def load_taxonomy(path=None) -> list[Categoria]:
@@ -130,7 +146,8 @@ def load_taxonomy(path=None) -> list[Categoria]:
     cats = []
     for c in data["categorias"]:
         cats.append(Categoria(c["id"], c["nome"], c.get("grupo", "Outros"),
-                              [Regra.from_dict(r) for r in c.get("regras", [])], c.get("alias_de")))
+                              [Regra.from_dict(r) for r in c.get("regras", [])], c.get("alias_de"),
+                              bool(c.get("usar_tese_ia", False))))
     ids = [c.id for c in cats]
     if len(ids) != len(set(ids)):
         raise ValueError("ids de categoria duplicados em categorias.yaml")
@@ -138,7 +155,16 @@ def load_taxonomy(path=None) -> list[Categoria]:
 
 
 def classify_one(f: dict, cats: list[Categoria]) -> tuple[Categoria, Regra | None, int]:
+    by_id = {c.id: c for c in cats}
     for c in cats:
+        if c.usar_tese_ia:
+            alvo = by_id.get(f.get("ia_tese") or "")
+            if alvo is None or alvo.alias_de or alvo.usar_tese_ia:
+                continue
+            for i, r in enumerate(c.regras):
+                if r.match(f):
+                    return Categoria(c.id, alvo.nome, alvo.grupo, c.regras, alias_de=alvo.id), r, i
+            continue
         for i, r in enumerate(c.regras):
             if r.match(f):
                 return c, r, i
@@ -182,11 +208,26 @@ def _sinais_regulamento(con) -> pd.DataFrame | None:
     return p
 
 
+def _leitura_ia(con) -> pd.DataFrame | None:
+    try:
+        d = con.execute("""SELECT cnpj, tese AS ia_tese, consignado AS ia_consignado, confianca AS ia_confianca,
+                                  multicedente AS ia_multicedente, multissacado AS ia_multissacado
+                           FROM regulamento_ia""").df()
+    except Exception:  # noqa: BLE001 - base sem leitura por IA
+        return None
+    return d if len(d) else None
+
+
 def features(con) -> pd.DataFrame:
     df = con.execute(FEATURES_SQL).df()
     sig = _sinais_regulamento(con)
     if sig is not None:
         df = df.merge(sig, on="cnpj", how="left")
+    ia = _leitura_ia(con)
+    if ia is not None:
+        df = df.merge(ia, on="cnpj", how="left")
+        for c in ia.columns.drop("cnpj"):
+            df[c] = df[c].astype(object).where(df[c].notna(), None)
     df["tem_reg"] = df["tem_reg"].fillna(False).astype(bool) if "tem_reg" in df else False
     seg = df[[f"seg_{s}" for s in SEGMENTOS]].clip(lower=0)
     total = seg.sum(axis=1)
@@ -229,7 +270,7 @@ def build_table(con) -> None:
     con.execute("CREATE OR REPLACE TABLE classificacao AS SELECT * FROM _cls")
     con.unregister("_cls")
     cats = load_taxonomy()
-    tax = pd.DataFrame([(i, c.id, c.nome, c.grupo) for i, c in enumerate(cats) if not c.alias_de],
+    tax = pd.DataFrame([(i, c.id, c.nome, c.grupo) for i, c in enumerate(cats) if not c.alias_de and not c.usar_tese_ia],
                        columns=["ordem", "categoria", "categoria_nome", "grupo"])
     con.register("_tax", tax)
     con.execute("CREATE OR REPLACE TABLE categoria AS SELECT * FROM _tax")

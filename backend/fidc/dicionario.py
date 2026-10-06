@@ -127,6 +127,28 @@ def _merge_catalogo() -> None:
         "desempenho_real": ("Desempenho real", "pct100", ""), "desempenho_esperado": ("Desempenho esperado", "pct100", ""),
         "tipo": ("Tipo de cota", "txt", "senior, mezanino ou subordinada (júnior), lido do nome da série"),
         "serie": ("Série / subclasse", "txt", ""),
+        # estrutura x regulamento
+        "status_sub": ("Subordinação vs mínimo", "txt", "abaixo do mínimo / folga < 3 p.p. / ok / sem mínimo"),
+        "sub_min_senior": ("Subordinação mínima", "pct", "Mínimo exigido pelo regulamento (manual > IA > regras > referência da categoria)"),
+        "sub_min_senior_fonte": ("Fonte do mínimo", "txt", ""),
+        "folga_sub_min_senior": ("Folga da subordinação", "pct", "Subordinação atual (informe) − mínima"),
+        "jr_min_pl": ("Jr mínima (% PL)", "pct", "Mínimo de cotas subordinadas júnior pelo regulamento"),
+        "jr_min_pl_fonte": ("Fonte Jr mínima", "txt", ""),
+        "folga_jr_min_pl": ("Folga da Jr", "pct", "Jr/PL atual − Jr mínima"),
+        "top1_cedente_frac": ("Maior cedente (informe)", "pct", "% da carteira do maior cedente (Tab. I)"),
+        "limite_maior_cedente": ("Limite maior cedente", "pct", "Limite do regulamento (% do PL)"),
+        "limite_maior_cedente_fonte": ("Fonte limite cedente", "txt", ""),
+        "limite_maior_sacado": ("Limite maior sacado", "pct", "Limite do regulamento (% do PL)"),
+        "n_com_minimo": ("Fundos com mínimo", "int", "Fundos com subordinação mínima conhecida (inclui referência da categoria)"),
+        "sub_min_p25": ("Sub. mínima P25", "pct", "Entre os regulamentos lidos da categoria"),
+        "sub_min_mediana": ("Sub. mínima mediana", "pct", "Entre os regulamentos lidos da categoria"),
+        "sub_min_p75": ("Sub. mínima P75", "pct", ""),
+        "sub_min_referencia": ("Referência da categoria", "pct", "Subordinação mínima de referência (editável na página do setor)"),
+        "folga_mediana": ("Folga mediana", "pct", "Mediana de subordinação atual − mínima"),
+        "n_abaixo": ("Abaixo do mínimo", "int", "Fundos com subordinação atual abaixo do mínimo"),
+        "n_folga_3pp": ("Folga < 3 p.p.", "int", ""),
+        "pl_abaixo": ("PL abaixo do mínimo", "brl", ""),
+        "jr_min_mediana": ("Jr mínima mediana", "pct", ""),
     })
 
 

@@ -12,6 +12,7 @@ export default function Mercado() {
   const meta = useMeta()
   const cats = useApi<Row[]>('/api/categorias')
   const hist = useApi<Row[]>('/api/mercado/historico')
+  const estr = useApi<Row[]>('/api/mercado/estrutura')
 
   const { data, series } = useMemo(() => {
     if (!hist.data) return { data: [], series: [] }
@@ -68,6 +69,20 @@ export default function Mercado() {
         <p className="muted">
           Inad./PDD/subordinação da categoria = agregados ponderados (soma dos numeradores / soma dos denominadores).
           Medianas são por fundo, menos sensíveis a poucos fundos grandes ou com dado ruim.
+        </p>
+      </div>
+      <div className="card">
+        <Loading q={estr} />
+        <DataGrid title="Estrutura x regulamento por categoria" rows={estr.data} exportUrl="/api/mercado/estrutura" height={480}
+          cols={[
+            { field: 'categoria_nome', minWidth: 260,
+              cellRenderer: (p: any) => <Link to={`/setores/${p.data.categoria}`}>{p.value}</Link> },
+            { field: 'n_fundos', sort: 'desc' }, 'n_com_minimo', 'sub_min_p25', 'sub_min_mediana', 'sub_min_p75',
+            'sub_min_referencia', 'subordinacao_mediana', 'folga_mediana', 'n_abaixo', 'n_folga_3pp', 'pl_abaixo', 'jr_min_mediana',
+          ]} />
+        <p className="muted">
+          Subordinação mínima lida nos regulamentos (manual &gt; IA &gt; regras) e referência editável por categoria
+          (aba "Estrutura x regulamento" de cada setor). Folga = subordinação atual (informe) − mínimo.
         </p>
       </div>
     </div>

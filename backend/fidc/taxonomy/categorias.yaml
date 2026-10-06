@@ -22,6 +22,8 @@
 #   taxa_min / taxa_max: taxa média de aquisição da Tab. IX, % a.a. (só quando entre 12% e 100%)
 #   reg_min:   {sinal: n, ...}  o regulamento vigente (FNET) menciona o sinal pelo menos n vezes
 #   reg_max:   {sinal: n, ...}  ... no máximo n vezes (fundo sem regulamento lido passa)
+#   ia_tese: [...] / ia_consignado: [...] / ia_confianca_min: media   leitura do regulamento por IA
+#   usar_tese_ia: true (no nível da categoria)  a categoria final é a tese lida pela IA
 #   com_regulamento: true   só vale para fundo com regulamento lido
 #   reg_maior: {sinal: [outros]} o sinal aparece mais que a soma dos outros
 #              ("a+b" soma sinais). Sinais em backend/fidc/regulamentos.py (SINAIS): consignado,
@@ -87,6 +89,46 @@ categorias:
       - nome_inclui: ['CONSIGNADO PRIVADO', '\bCLT\b', 'TRABALHADOR', 'E-?CONSIGNADO']
       - segmento_min: {segmentos: [F2], pct: 0.5}
         nome_inclui: ['PRIVADO', '\bCLT\b', 'TRABALHADOR', 'EMPRESA']
+
+  # ---- leitura do regulamento por IA (agente_regulamento.py): vale mais que as regras de texto
+  - id: consignado_privado_ia
+    nome: Consignado privado
+    grupo: Consignado
+    alias_de: consignado_privado
+    regras:
+      - ia_tese: [consignado]
+        ia_consignado: [privado_clt]
+        ia_confianca_min: media
+
+  - id: consignado_publico_ia
+    nome: Consignado público
+    grupo: Consignado
+    alias_de: consignado_publico
+    regras:
+      - ia_tese: [consignado]
+        ia_consignado: [inss, servidor_publico, publico_misto]
+        ia_confianca_min: media
+
+  - id: consignado_misto_ia
+    nome: Consignado (público/privado a classificar)
+    grupo: Consignado
+    alias_de: consignado_indefinido
+    regras:
+      - ia_tese: [consignado]
+        ia_consignado: [misto_publico_privado]
+        ia_confianca_min: media
+        revisar: true
+
+  # segmento consignado na Tab. II, mas a IA leu outra tese no regulamento: vale a tese da IA
+  - id: tese_ia_f2
+    nome: (tese lida pela IA)
+    grupo: Outros
+    usar_tese_ia: true
+    regras:
+      - segmento_min: {segmentos: [F2], pct: 0.5}
+        ia_consignado: [nao_e_consignado]
+        ia_confianca_min: media
+        revisar: true
 
   # ---- regulamento (FNET): a tese escrita no regulamento vale mais que a heurística de prazo/taxa
   - id: consignado_privado_reg
@@ -190,6 +232,15 @@ categorias:
     nome: Multicedente multissacado
     grupo: Recebíveis comerciais
     regras:
+      # regulamento lido pela IA como MCMS e carteira sem cedente dominante
+      - ia_tese: [multicedente_multissacado]
+        ia_confianca_min: media
+        segmento_min: {segmentos: [A, C1, C2, C3, D1, H1, H2, F8], pct: 0.5}
+        top1_cedente_max: 50
+      - ia_tese: [multicedente_multissacado]
+        ia_confianca_min: media
+        segmento_min: {segmentos: [A, C1, C2, C3, D1, H1, H2, F8], pct: 0.5}
+        sem_cedente: true
       - nome_inclui: ['MULTI.?CEDENTE', 'MULTI.?SSACADO', 'MULTI.?SACADO']
       - segmento_min: {segmentos: [A, C1, C2, D1, H1, H2, F8], pct: 0.5}
         top1_cedente_max: 15
@@ -261,6 +312,16 @@ categorias:
     grupo: Setor público e judicial
     regras:
       - segmento_min: {segmentos: [I2, I3, I4], pct: 0.5}
+
+  # "Financeiro - outros" não diz o lastro: usa a tese que a IA leu no regulamento
+  - id: tese_ia_outros
+    nome: (tese lida pela IA)
+    grupo: Outros
+    usar_tese_ia: true
+    regras:
+      - segmento_min: {segmentos: [F8], pct: 0.5}
+        ia_confianca_min: media
+        revisar: true
 
   - id: financeiro_outros
     nome: Financeiro – outros (sem detalhe na CVM)

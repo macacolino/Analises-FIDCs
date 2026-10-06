@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useApi, useTaxonomia, type Row } from '../api'
+import { useQueryClient } from '@tanstack/react-query'
+import { send, useApi, useTaxonomia, type Row } from '../api'
 import { Bars, RankBars, TimeLines } from '../components/Charts'
 import { DataGrid } from '../components/DataGrid'
 import { Kpi, Loading, Tabs } from '../components/ui'
@@ -17,7 +18,7 @@ export default function Setor() {
   const nav = useNavigate()
   const tax = useTaxonomia()
   const setor = useApi<{ historico: Row[]; aging: Row[] }>(`/api/setores/${categoria}`)
-  const [tab, setTab] = useState<'fundos' | 'series' | 'safra' | 'bcb' | 'orig' | 'gest' | 'rf' | 'dist'>('fundos')
+  const [tab, setTab] = useState<'fundos' | 'series' | 'safra' | 'bcb' | 'orig' | 'gest' | 'rf' | 'dist' | 'estr'>('fundos')
   const [tipoSerie, setTipoSerie] = useState('')
   const [safraMetrica, setSafraMetrica] = useState('inad_90')
   const rankUrl = `/api/setores/${categoria}/ranking`
@@ -99,7 +100,7 @@ export default function Setor() {
         </div>
       )}
       <div className="card">
-        <Tabs value={tab} onChange={setTab} options={[['fundos', 'Ranking de fundos'], ['dist', 'Distribuição'], ['series', 'Ranking de séries'], ['rf', 'Red flags do setor'], ['bcb', 'Mercado (Banco Central)'], ['orig', 'Originadores / cedentes'], ['gest', 'Gestores'], ['safra', 'Safra de fundos']]} />
+        <Tabs value={tab} onChange={setTab} options={[['fundos', 'Ranking de fundos'], ['estr', 'Estrutura x regulamento'], ['dist', 'Distribuição'], ['series', 'Ranking de séries'], ['rf', 'Red flags do setor'], ['bcb', 'Mercado (Banco Central)'], ['orig', 'Originadores / cedentes'], ['gest', 'Gestores'], ['safra', 'Safra de fundos']]} />
         {tab === 'fundos' && (
           <DataGrid rows={ranking.data} exportUrl={rankUrl} height={560}
             cols={['nome', 'gestor', { field: 'pl', sort: 'desc' }, 'inad_90', 'inad_contratos', 'pdd_carteira',
@@ -124,6 +125,7 @@ export default function Setor() {
         {tab === 'rf' && <SetorTabela url={`/api/setores/${categoria}/redflags`} cols={['red_flag', { field: 'regra', width: 380 }, 'n_fundos', 'amarelo', 'vermelho', 'pct_com_flag', 'pl_com_flag']}
           nota="Fundos da categoria no mês de referência; red flags calculadas pelo informe (biblioteca MCMS)." />}
         {tab === 'dist' && <Distribuicao categoria={categoria} />}
+        {tab === 'estr' && <Estrutura categoria={categoria} />}
         {tab === 'safra' && (
           <div className="stack">
             <div className="row">
@@ -218,6 +220,55 @@ function Distribuicao({ categoria }: { categoria: string }) {
         data={d.data.map((r) => ({ cnpj: r.cnpj, nome: r.nome, valor: r.valor, marca: r.listas || undefined }))}
         onClick={(c) => nav(`/fundo/${c}`)} />}
       <p className="muted">Fundos da categoria no mês de referência, sem os com erro de consistência. Clique numa barra para abrir a lâmina.</p>
+    </div>
+  )
+}
+
+/* ---------- estrutura atual x mínimos do regulamento, com referência editável da categoria ---------- */
+function Estrutura({ categoria }: { categoria: string }) {
+  const qc = useQueryClient()
+  const url = `/api/setores/${categoria}/estrutura`
+  const refUrl = `/api/categorias/${categoria}/referencia`
+  const d = useApi<Row[]>(url)
+  const refs = useApi<Row[]>(refUrl, { staleTime: 0 })
+  const [edit, setEdit] = useState<Record<string, string>>({})
+  const salvar = async (chave: string) => {
+    const txt = (edit[chave] ?? '').trim()
+    await send('PUT', refUrl, { chave, valor_num: txt === '' ? null : Number(txt.replace(',', '.')) / 100, fonte: 'referência interna' })
+    setEdit({ ...edit, [chave]: '' })
+    qc.invalidateQueries({ queryKey: [refUrl] }); qc.invalidateQueries({ queryKey: [url] })
+  }
+  const st = useMemo(() => {
+    const c: Record<string, number> = {}
+    for (const r of d.data ?? []) c[r.status_sub] = (c[r.status_sub] ?? 0) + 1
+    return c
+  }, [d.data])
+  return (
+    <div className="stack">
+      <div className="card stack" style={{ gap: 6 }}>
+        <b>Referência da categoria</b>
+        <span className="muted">Vale para os fundos sem mínimo próprio (manual, leitura IA ou por regras do regulamento).
+          Ao lado, a distribuição dos mínimos lidos nos regulamentos da categoria para calibrar.</span>
+        <table className="simple">
+          <thead><tr><th>Parâmetro</th><th className="r">Regulamentos lidos</th><th className="r">P25</th><th className="r">Mediana</th>
+            <th className="r">P75</th><th className="r">Referência atual</th><th>Nova referência (%)</th><th /></tr></thead>
+          <tbody>{refs.data?.map((r) => (
+            <tr key={r.chave}><td>{r.label}</td><td className="r">{r.n_regulamentos}</td>
+              <td className="r">{fmtValue(r.p25, 'pct')}</td><td className="r">{fmtValue(r.mediana, 'pct')}</td><td className="r">{fmtValue(r.p75, 'pct')}</td>
+              <td className="r">{r.valor_num != null ? fmtValue(r.valor_num, 'pct') : '–'}{r.autor && <div className="muted">{r.autor}</div>}</td>
+              <td><input type="text" style={{ width: 90 }} placeholder="ex.: 33,33" value={edit[r.chave] ?? ''}
+                onChange={(e) => setEdit({ ...edit, [r.chave]: e.target.value })} /></td>
+              <td><button style={{ padding: '0 8px' }} onClick={() => salvar(r.chave)}>{(edit[r.chave] ?? '') === '' && r.valor_num != null ? 'Limpar' : 'Salvar'}</button></td></tr>))}</tbody>
+        </table>
+      </div>
+      <div className="sub">Subordinação vs mínimo: {['abaixo do mínimo', 'folga < 3 p.p.', 'ok', 'sem mínimo'].map((k) => `${k} ${st[k] ?? 0}`).join(' · ')}</div>
+      <Loading q={d} />
+      <DataGrid rows={d.data} exportUrl={url} height={560}
+        cols={['nome', 'gestor', { field: 'pl', sort: 'desc' }, 'status_sub', 'subordinacao', 'sub_min_senior', 'sub_min_senior_fonte',
+               'folga_sub_min_senior', 'jr_pl', 'jr_min_pl', 'jr_min_pl_fonte', 'folga_jr_min_pl', 'top1_cedente_frac',
+               'limite_maior_cedente', 'limite_maior_cedente_fonte', 'limite_maior_sacado']} />
+      <p className="muted">Mínimo por fundo: manual &gt; leitura IA &gt; leitura por regras &gt; referência da categoria. Maior cedente do informe
+        é % da carteira; o limite do regulamento costuma ser % do PL - comparação aproximada.</p>
     </div>
   )
 }

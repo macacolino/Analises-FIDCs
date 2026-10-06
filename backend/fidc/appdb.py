@@ -72,6 +72,15 @@ CREATE TABLE IF NOT EXISTS cnpj_nome (
     detalhe     TEXT,
     consultado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS categoria_ref (   -- referência de estrutura por categoria (ex.: subordinação mínima típica)
+    categoria   TEXT NOT NULL,
+    chave       TEXT NOT NULL,
+    valor_num   REAL,
+    fonte       TEXT,
+    autor       TEXT,
+    atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (categoria, chave)
+);
 CREATE TABLE IF NOT EXISTS override_categoria (
     cnpj        TEXT PRIMARY KEY,
     categoria   TEXT NOT NULL,

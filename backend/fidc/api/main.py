@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import appdb, comparacao, consultas, dicionario, excel, fnet
+from .. import appdb, comparacao, config, consultas, dicionario, excel, fnet
 from . import v2
 from ..etl import pipeline
 from ..taxonomy import classify
@@ -148,7 +148,7 @@ class CategoriaIn(BaseModel):
 
 @app.put("/api/fundos/{cnpj}/categoria")
 def set_categoria(cnpj: str, body: CategoriaIn, request: Request, bg: BackgroundTasks):
-    ids = {c.id for c in classify.load_taxonomy() if not c.alias_de}
+    ids = {c.id for c in classify.load_taxonomy() if not c.alias_de and not c.usar_tese_ia}
     if body.categoria not in ids:
         raise HTTPException(400, "Categoria inexistente")
     with appdb.session() as s:
@@ -290,7 +290,7 @@ def lista_eventos(tipo: str, dias: int = 60):
 # ------------------------------------------------------------------ taxonomia e ETL
 @app.get("/api/taxonomia")
 def taxonomia():
-    return [{"id": c.id, "nome": c.nome, "grupo": c.grupo} for c in classify.load_taxonomy() if not c.alias_de]
+    return [{"id": c.id, "nome": c.nome, "grupo": c.grupo} for c in classify.load_taxonomy() if not c.alias_de and not c.usar_tese_ia]
 
 
 def _run_etl(download: bool = True):
@@ -324,6 +324,26 @@ def _agendador():
             prox += timedelta(days=1)
         time.sleep((prox - agora).total_seconds())
         _run_etl(True)
+        _bimestral()
+
+
+def _bimestral():
+    """A cada ~60 dias: reaplica as regras de leitura aos regulamentos baixados e, se houver ANTHROPIC_API_KEY,
+    lê por IA os regulamentos novos ou alterados (lote, 50% de desconto). Reconstrói a base depois."""
+    marca = config.DATA_DIR / ".regulamentos_bimestral"
+    try:
+        if marca.exists() and time.time() - marca.stat().st_mtime < 60 * 86400:
+            return
+        from .. import agente_regulamento, regulamentos
+        regulamentos.reler_textos()
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            itens = agente_regulamento.pendentes()
+            if itens:
+                agente_regulamento.lote(itens)
+        marca.touch()
+        _run_etl(False)
+    except Exception as e:  # noqa: BLE001 - rotina de fundo não derruba o app
+        logging.getLogger(__name__).warning("rotina bimestral de regulamentos falhou: %s", e)
 
 
 @app.exception_handler(RuntimeError)

@@ -94,8 +94,8 @@ export default function Glossario() {
       {cat.data && (
         <div className="card"><h2>Dados de regulamento e do gestor</h2>
           <p className="muted">Subordinação mínima, Jr mínima, limites de concentração e responsabilidade limitada são lidos
-            automaticamente do regulamento vigente no FNET (regras de texto, sem IA), sempre com a página e o trecho. O dado
-            manual prevalece sobre o extraído. Os demais dependem de preenchimento manual.</p>
+            automaticamente do regulamento vigente no FNET (leitura por IA quando disponível, senão regras de texto), sempre
+            com a página e o trecho. Precedência: manual &gt; IA &gt; regras &gt; referência da categoria (editável na página do setor). Os demais dependem de preenchimento manual.</p>
           <table className="simple">
             <thead><tr><th>Dado</th><th>Fonte típica</th><th>Usado em</th></tr></thead>
             <tbody>{cat.data.parametros.filter((p: Row) => ok(p.label, p.uso)).map((p: Row) => (

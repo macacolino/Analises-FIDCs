@@ -185,7 +185,7 @@ function RegulamentoExtraido({ cnpj, onConfirm }: { cnpj: string; onConfirm: () 
   if (!r) return <Loading q={d} />
   const confirmar = async (c: Row) => {
     await send('PUT', `/api/fundos/${cnpj}/params`, { chave: c.campo, competencia: '', valor_num: c.valor_num,
-      valor_txt: c.valor_txt, fonte: `Regulamento${c.pagina ? ` p. ${c.pagina}` : ''} (extração confirmada)`, data_base: r.data_entrega?.slice(0, 10) ?? null })
+      valor_txt: c.valor_txt, fonte: `Regulamento${c.pagina ? ` p. ${c.pagina}` : ''} (${c.fonte === 'ia' ? 'leitura IA' : 'extração'} confirmada)`, data_base: r.data_entrega?.slice(0, 10) ?? null })
     onConfirm(); d.refetch()
   }
   const params = (r.campos ?? []).filter((c: Row) => c.parametro)
@@ -199,18 +199,34 @@ function RegulamentoExtraido({ cnpj, onConfirm }: { cnpj: string; onConfirm: () 
         {r.url_ver && <a href={r.url_ver} target="_blank" rel="noreferrer">abrir no FNET</a>}
         {r.url_pdf && <a href={r.url_pdf} target="_blank" rel="noreferrer">baixar PDF</a>}
       </div>
-      <p className="muted" style={{ margin: 0 }}>Leitura automática por regras (sem IA). Os valores abaixo entram nas métricas derivadas
+      <p className="muted" style={{ margin: 0 }}>Leitura automática do regulamento (IA quando disponível, senão regras de texto). Os valores abaixo entram nas métricas derivadas
         enquanto não houver dado manual; confira o trecho e clique em Confirmar para gravar como dado manual.</p>
+      {r.ia && (
+        <div className="card" style={{ background: 'var(--surface-2, transparent)' }}>
+          <b>Leitura por IA</b> <span className="muted">({r.ia.modelo}, confiança {r.ia.confianca}, {String(r.ia.processado_em).slice(0, 10)})</span>
+          <div>Tese: <b>{r.ia.tese}</b>{r.ia.consignado && r.ia.consignado !== 'nao_e_consignado' && <> · consignado: <b>{r.ia.consignado}</b></>}
+            {r.ia.multicedente != null && <> · multicedente: {r.ia.multicedente ? 'sim' : 'não'}</>}
+            {r.ia.multissacado != null && <> · multissacado: {r.ia.multissacado ? 'sim' : 'não'}</>}</div>
+          <div className="muted">{r.ia.lastro}</div>
+          {r.ia.observacoes && <div className="muted">{r.ia.observacoes}</div>}
+          {(r.ia.eventos_avaliacao?.length > 0 || r.ia.eventos_liquidacao?.length > 0) && (
+            <div className="grid2" style={{ marginTop: 6 }}>
+              <div><b>Eventos de avaliação</b><ul>{r.ia.eventos_avaliacao.map((e: string, i: number) => <li key={i}>{e}</li>)}</ul></div>
+              <div><b>Eventos de liquidação</b><ul>{r.ia.eventos_liquidacao.map((e: string, i: number) => <li key={i}>{e}</li>)}</ul></div>
+            </div>)}
+        </div>
+      )}
       {r.teses?.length > 0 && (
         <div className="muted">Tese pelo texto (menções): {r.teses.slice(0, 5).map((t: Row) => `${t.tese} ${t.mencoes}`).join(' · ')}</div>
       )}
       {params.length > 0 && (
         <table className="simple">
-          <thead><tr><th>Dado</th><th className="r">Valor extraído</th><th>Página</th><th>Confiança</th><th>Trecho</th><th /></tr></thead>
+          <thead><tr><th>Dado</th><th className="r">Valor extraído</th><th>Leitura</th><th>Página</th><th>Confiança</th><th>Trecho</th><th /></tr></thead>
           <tbody>{params.map((c: Row) => (
             <tr key={c.campo}>
               <td>{c.label}</td>
               <td className="r">{c.valor_num != null ? fmtValue(c.valor_num, c.fmt) : c.valor_txt}</td>
+              <td className="muted">{c.fonte === 'ia' ? 'IA' : 'regras'}</td>
               <td>{c.pagina ?? ''}</td><td className="muted">{c.confianca}</td>
               <td style={{ maxWidth: 640 }}><details><summary className="muted" style={{ cursor: 'pointer' }}>{String(c.trecho).slice(0, 90)}…</summary>
                 <div style={{ whiteSpace: 'pre-wrap' }}>{c.trecho}</div></details></td>

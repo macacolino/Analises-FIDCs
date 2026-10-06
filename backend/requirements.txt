@@ -8,3 +8,4 @@ pyyaml>=6.0
 pytz
 pytest>=8
 pypdf>=5
+anthropic>=1.11

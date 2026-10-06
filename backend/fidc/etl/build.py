@@ -21,7 +21,7 @@ from pathlib import Path
 import duckdb
 
 from .. import config
-from .. import regulamentos
+from .. import agente_regulamento, regulamentos
 from ..taxonomy import classify
 from . import bcb, casa, cvm_cadastro, qualidade
 
@@ -548,6 +548,18 @@ LEFT JOIN sv s5 ON s5.cnpj = m.cnpj AND s5.safra = CAST(last_day(m.dt - INTERVAL
 """
 
 
+# parâmetros do regulamento por fundo: leitura por IA prevalece sobre a leitura por regras
+# (o dado manual, no app.sqlite, prevalece sobre os dois - aplicado na API)
+REG_PARAM_SQL = """
+CREATE OR REPLACE TABLE regulamento_param AS
+SELECT cnpj, campo, valor_num, valor_txt, 'ia' AS fonte, pagina, trecho FROM regulamento_ia_campo
+UNION ALL
+SELECT r.cnpj, r.campo, r.valor_num, r.valor_txt, 'regras' AS fonte, r.pagina, r.trecho FROM regulamento_campo r
+WHERE r.campo NOT IN ('eventos_avaliacao', 'eventos_liquidacao', 'jr_min_sobre_subordinadas')
+  AND NOT EXISTS (SELECT 1 FROM regulamento_ia_campo i WHERE i.cnpj = r.cnpj AND i.campo = r.campo)
+"""
+
+
 def build(db_path: Path | None = None) -> Path:
     """Reconstrói a base inteira. Retorna o caminho do arquivo final."""
     final = Path(db_path or config.DB_PATH)
@@ -561,7 +573,8 @@ def build(db_path: Path | None = None) -> Path:
     log.info("bcb"); bcb.build_table(con)
     log.info("casa_mes / safras"); casa.build(con)
     log.info("qualidade"); qualidade.build(con)
-    log.info("regulamentos"); regulamentos.build_table(con)
+    log.info("regulamentos"); regulamentos.build_table(con); agente_regulamento.build_table(con)
+    con.execute(REG_PARAM_SQL)
     log.info("classificacao"); classify.build_table(con)
     log.info("comp_mes")
     con.execute(COMP_SQL)

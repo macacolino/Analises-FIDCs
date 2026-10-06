@@ -87,6 +87,19 @@ O regulamento vigente de cada fundo é baixado do FNET (B3) — **gratuito, sem 
   `--cnpj X Y` (fundos específicos), `--reler` (reaplica as regras sem baixar), `--seed` (exporta o resultado para
   `backend/fidc/seed/`, que vai no repositório para o Codespace não precisar baixar tudo). O ETL diário lê até 150
   regulamentos novos por execução.
+- **Leitura por IA** (`fidc/agente_regulamento.py`, Claude Sonnet 5.5): lê os trechos relevantes do regulamento
+  (até 60 mil caracteres, incluindo as páginas onde as regras acharam parâmetros) e devolve tese/lastro, tipo de
+  consignado (INSS, servidor, privado CLT, misto), multicedente/multissacado, parâmetros com página e trecho e os
+  gatilhos de avaliação/liquidação. Precedência dos parâmetros: manual > IA > regras > referência da categoria.
+  Na classificação: nome explícito > IA (confiança média ou alta) > regras > heurística; "Financeiro – outros"
+  passa a usar a tese lida pela IA. Requer `ANTHROPIC_API_KEY` (no Codespace: Settings → Secrets).
+  `python -m fidc.agente_regulamento --estimar` mostra quantos fundos e o custo estimado; `--pendentes` envia em lote
+  (Batches API, 50% de desconto). O app roda sozinho a cada ~60 dias (regras de novo + IA nos regulamentos novos
+  ou alterados). Estimativa para o mercado inteiro: ~US$ 80 por rodada completa (2.468 regulamentos); as rodadas
+  seguintes só pegam o que mudou.
+- **Estrutura x regulamento**: aba no setor com subordinação/Jr atuais × mínimos de cada fundo, status (abaixo do
+  mínimo, folga < 3 p.p.) e **referência editável por categoria** (vale para fundos sem mínimo próprio), com P25/
+  mediana/P75 dos mínimos lidos para calibrar. No Mercado, quadro por categoria.
 - PDFs sem texto (escaneados) ficam como "ilegível". PDFs com fonte Calibri sem tabela de caracteres são decodificados
   por um mapa de glifos aprendido dos próprios regulamentos.
 
