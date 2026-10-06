@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useApi, useMeta, type Row } from '../api'
 import { StackedArea } from '../components/Charts'
 import { DataGrid } from '../components/DataGrid'
+import { Comparativo } from '../components/Comparativo'
 import { Kpi, Loading } from '../components/ui'
 import { mesAno } from '../fmt'
 
@@ -70,6 +71,10 @@ export default function Mercado() {
           Inad./PDD/subordinação da categoria = agregados ponderados (soma dos numeradores / soma dos denominadores).
           Medianas são por fundo, menos sensíveis a poucos fundos grandes ou com dado ruim.
         </p>
+      </div>
+      <div className="card">
+        <h2 style={{ marginTop: 0 }}>Comparativo por estratégia</h2>
+        <Comparativo />
       </div>
       <div className="card">
         <Loading q={estr} />

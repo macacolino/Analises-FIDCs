@@ -75,20 +75,58 @@ METRICAS: list[tuple[str, str, str, int, str, str]] = [
     ("pl", "PL", "brl", 0, "Operação e liquidez", ""),
 ]
 
-RED_FLAGS = [
-    ("rf01_recompra", "Recompra mascarando inadimplência", "Recompra ÷ aquisições do mês: >5% A, >10% V"),
-    ("rf02_roll", "Roll 1-30→31-60 em alta", "Alta em 2 meses seguidos com atraso relevante"),
-    ("rf04_vencido_180", "Vencido > 180 d não baixado", ">1% PL A, >3% PL V"),
-    ("rf09_pdd_over90", "PDD ÷ Over 90", "<100% A, <70% V (com Over 90 ≥ 0,5% da carteira)"),
+RED_FLAGS = [  # (coluna, nome, regra em português: A = amarelo, V = vermelho)
+    ("rf01_recompra", "Recompra mascarando inadimplência",
+     "Amarelo: recompras pelo cedente acima de 5% das aquisições do mês. Vermelho: acima de 10%."),
+    ("rf02_roll", "Roll 1-30→31-60 em alta",
+     "Amarelo: a rolagem de atraso 1-30 d para 31-60 d subiu 2 meses seguidos, com atraso relevante na carteira."),
+    ("rf04_vencido_180", "Vencido > 180 d não baixado",
+     "Amarelo: parcelas vencidas há mais de 180 dias somam mais de 1% do PL. Vermelho: mais de 3% do PL."),
+    ("rf09_pdd_over90", "PDD ÷ Over 90",
+     "Amarelo: a PDD cobre menos de 100% do vencido > 90 dias. Vermelho: menos de 70%. "
+     "Só avaliada quando o vencido > 90 dias é pelo menos 0,5% da carteira."),
     ("rf10_alavancagem", "PL crescendo sem a Jr / subordinação caindo",
-     "PL 12m > 2x crescimento da Jr (e > 20%) ou subordinação −5 p.p. em 12m"),
-    ("rf14_jr_negativa", "Retorno negativo da Jr", "1 mês em 12 A; 2+ seguidos V"),
-    ("rf16_rj", "Cedidos por empresas em RJ", ">2% PL A, >5% PL V"),
-    ("rf17_spread", "Excesso de spread baixo", "<6% a.a. A, <3% a.a. V"),
-    ("rf19_recompra_desconto", "Recompra abaixo do contábil", "preço <95% A, <90% V no mês"),
-    ("rf23_fuga_senior", "Fuga da sênior", "resgate líquido 12m >15% A, >30% V do PL sênior"),
-    ("rf24_cedente", "Cedente relevante no informe", "maior cedente >10% A, >20% V (campo do informe)"),
+     "Amarelo: em 12 meses o PL cresceu mais que o dobro do crescimento da Jr (e mais de 20%), "
+     "ou a subordinação caiu mais de 5 p.p."),
+    ("rf14_jr_negativa", "Retorno negativo da Jr",
+     "Amarelo: a Jr rendeu negativo em 1 mês dos últimos 12. Vermelho: 2 ou mais meses negativos seguidos."),
+    ("rf16_rj", "Cedidos por empresas em RJ",
+     "Amarelo: créditos cedidos por empresas em recuperação judicial acima de 2% do PL. Vermelho: acima de 5%."),
+    ("rf17_spread", "Excesso de spread baixo",
+     "Amarelo: excesso de spread abaixo de 6% a.a. Vermelho: abaixo de 3% a.a."),
+    ("rf19_recompra_desconto", "Recompra abaixo do contábil",
+     "Amarelo: no mês, o cedente recomprou créditos a menos de 95% do valor contábil. Vermelho: a menos de 90%."),
+    ("rf23_fuga_senior", "Fuga da sênior",
+     "Amarelo: resgates líquidos da sênior em 12 meses acima de 15% do PL sênior. Vermelho: acima de 30%."),
+    ("rf24_cedente", "Cedente relevante no informe",
+     "Amarelo: o maior cedente responde por mais de 10% da carteira. Vermelho: mais de 20% (Tab. I do informe)."),
 ]
+
+# o que cada red flag quer dizer (aparece ao passar o mouse)
+RF_DEFINICAO = {
+    "rf01_recompra": "O cedente recompra do fundo créditos que atrasaram. Recompra alta em relação ao que o fundo "
+                     "compra pode esconder inadimplência: o atraso some da carteira do fundo e não aparece no informe.",
+    "rf02_roll": "Roll rate = parte do saldo em atraso de 1-30 dias que, no mês seguinte, passou para 31-60 dias. "
+                 "Subida contínua antecipa piora da inadimplência antes de ela chegar ao vencido > 90 dias.",
+    "rf04_vencido_180": "Crédito vencido há mais de 180 dias costuma já estar provisionado ou baixado. Mantê-lo na "
+                        "carteira em volume relevante pode inflar o PL e esconder perda que ainda vai bater na cota.",
+    "rf09_pdd_over90": "Compara a provisão (PDD) com o saldo vencido há mais de 90 dias. Provisão menor que o "
+                       "vencido indica provisionamento insuficiente: a perda ainda pode cair sobre as cotas.",
+    "rf10_alavancagem": "O fundo cresce com cotas sênior/mezanino sem o originador aportar Jr na mesma proporção, "
+                        "ou a subordinação está caindo: o colchão de proteção por real investido diminui.",
+    "rf14_jr_negativa": "A Jr rende negativo quando as perdas superam o excesso de spread. É o primeiro sinal de que "
+                        "o colchão das cotas sênior está sendo consumido.",
+    "rf16_rj": "Parte da carteira foi cedida por empresas em recuperação judicial: risco de questionamento da cessão "
+               "e de perda de coobrigação.",
+    "rf17_spread": "Excesso de spread = rentabilidade da carteira menos o custo das cotas sênior/mezanino e as "
+                   "despesas do fundo. É a primeira proteção contra perdas, antes de consumir a Jr.",
+    "rf19_recompra_desconto": "O cedente recomprou créditos pagando menos que o valor contábil: o fundo realiza perda "
+                              "e o crédito problemático sai da carteira.",
+    "rf23_fuga_senior": "Investidores da sênior estão resgatando em volume relevante: pode indicar perda de confiança "
+                        "e reduz a escala do fundo.",
+    "rf24_cedente": "Concentração no maior cedente informado na Tab. I: se ele tiver problema (fraude, recompra não "
+                    "honrada, RJ), o impacto no fundo é proporcional à concentração.",
+}
 
 BLOCOS = ["Colchão e estrutura", "Perdas e carteira", "Concentração e lastro", "Retorno e spread",
           "Operação e liquidez"]

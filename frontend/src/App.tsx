@@ -8,6 +8,7 @@ import Grupos from './pages/Grupos'
 import Qualidade from './pages/Qualidade'
 import Lista from './pages/Lista'
 import Mercado from './pages/Mercado'
+import Oportunidades from './pages/Oportunidades'
 import Pesquisa from './pages/Pesquisa'
 import Setor from './pages/Setor'
 
@@ -19,6 +20,7 @@ export default function App() {
         <span className="logo">Analisador de FIDCs</span>
         <nav>
           <NavLink to="/" end>Mercado</NavLink>
+          <NavLink to="/oportunidades">Oportunidades</NavLink>
           <NavLink to="/setores">Setores</NavLink>
           <NavLink to="/pesquisa">Pesquisa</NavLink>
           <NavLink to="/comparar">Comparar</NavLink>
@@ -37,6 +39,7 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/" element={<Mercado />} />
+          <Route path="/oportunidades" element={<Oportunidades />} />
           <Route path="/setores" element={<Setor />} />
           <Route path="/setores/:categoria" element={<Setor />} />
           <Route path="/pesquisa" element={<Pesquisa />} />

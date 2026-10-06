@@ -46,7 +46,9 @@ CONSIGNADO = ["nao_e_consignado", "inss", "servidor_publico", "publico_misto", "
               "misto_publico_privado"]
 CAMPOS = ["sub_min_senior", "jr_min_pl", "mz_min_pl", "limite_maior_cedente", "limite_5_cedentes",
           "limite_10_cedentes", "limite_maior_sacado", "limite_5_sacados", "limite_10_sacados",
-          "responsabilidade_limitada", "prazo_resgate_dias", "gatilho_f30_pl"]
+          "responsabilidade_limitada", "prazo_resgate_dias", "gatilho_f30_pl",
+          "taxa_gestao", "taxa_administracao", "taxa_performance", "taxa_minima_cessao"]
+FOCO_PRECATORIO = ["nao_se_aplica", "federal", "estadual_municipal", "misto"]
 
 _num_ou_nulo = {"anyOf": [{"type": "number"}, {"type": "null"}]}
 _txt_ou_nulo = {"anyOf": [{"type": "string"}, {"type": "null"}]}
@@ -76,11 +78,15 @@ SCHEMA = {
         }},
         "eventos_avaliacao": {"type": "array", "items": {"type": "string"}},
         "eventos_liquidacao": {"type": "array", "items": {"type": "string"}},
+        "benchmark_senior": _txt_ou_nulo,
+        "foco_precatorio": {"type": "string", "enum": FOCO_PRECATORIO},
+        "precatorio_alimentar": _bool_ou_nulo,
         "confianca": {"type": "string", "enum": ["alta", "media", "baixa"]},
         "observacoes": {"type": "string"},
     },
     "required": ["tese", "lastro", "consignado", "pct_consignado_estimado", "multicedente", "multissacado",
-                 "campos", "eventos_avaliacao", "eventos_liquidacao", "confianca", "observacoes"],
+                 "campos", "eventos_avaliacao", "eventos_liquidacao", "benchmark_senior", "foco_precatorio",
+                 "precatorio_alimentar", "confianca", "observacoes"],
     "additionalProperties": False,
 }
 
@@ -107,6 +113,15 @@ Responda no formato JSON pedido:
   página e um trecho literal curto (até 300 caracteres) que sustenta o valor.
 - eventos_avaliacao / eventos_liquidacao: lista curta (até 8 itens cada) dos gatilhos, em poucas palavras,
   priorizando os quantitativos (ex.: "subordinação abaixo do mínimo por 3 dias úteis").
+- taxas (em campos): taxa_gestao e taxa_administracao como fração ao ano do PL (0,5% a.a. -> 0.005); se for
+  valor fixo em R$, valor null e o texto em valor_txt. taxa_performance: fração sobre o que exceder o benchmark
+  (20% -> 0.2), com o benchmark da performance no trecho. taxa_minima_cessao: taxa mínima de cessão/desconto
+  exigida nas aquisições, como fração ao mês ou ao ano conforme escrito (diga qual no trecho).
+- benchmark_senior: remuneração alvo da sênior como texto curto (ex.: "CDI + 3,0% a.a.", "110% do CDI",
+  "IPCA + 8% a.a."); null se não estiver nos trechos (muitas vezes está só no suplemento da série).
+- foco_precatorio: para fundos de precatórios/direitos contra o poder público, "federal" (União, TRFs),
+  "estadual_municipal" ou "misto"; "nao_se_aplica" para os demais. precatorio_alimentar: true se o foco for
+  precatórios de natureza alimentar, false se for comum, null se não disser ou não se aplicar.
 - confianca: baixa se os trechos não bastaram para concluir.
 - observacoes: o que for relevante e não coube acima (até 3 frases)."""
 
@@ -120,6 +135,8 @@ _TERMOS = {
     r"concentrac|diversificac|maior(es)? (cedente|devedor|sacado)|mesmo (cedente|devedor|sacado)": 4,
     r"eventos? de avaliac|eventos? de liquidac": 3,
     r"responsabilidade (i)?limitada": 1,
+    r"taxa de (gestao|administracao|performance)|taxa minima|benchmark|meta de rentabilidade|remuneracao alvo": 5,
+    r"precatori|natureza alimentar|requisicoes? de pequeno valor": 3,
 }
 
 
@@ -306,6 +323,8 @@ def tabelas():
                    "consignado": j.get("consignado"), "pct_consignado": j.get("pct_consignado_estimado"),
                    "multicedente": j.get("multicedente"), "multissacado": j.get("multissacado"),
                    "confianca": j.get("confianca"), "observacoes": j.get("observacoes"),
+                   "benchmark_senior": j.get("benchmark_senior"), "foco_precatorio": j.get("foco_precatorio"),
+                   "precatorio_alimentar": j.get("precatorio_alimentar"),
                    "eventos_avaliacao": json.dumps(j.get("eventos_avaliacao") or [], ensure_ascii=False),
                    "eventos_liquidacao": json.dumps(j.get("eventos_liquidacao") or [], ensure_ascii=False)})
         for c in j.get("campos") or []:
@@ -317,7 +336,8 @@ def tabelas():
                            "valor_txt": c.get("valor_txt"), "trecho": (c.get("trecho") or "")[:600],
                            "pagina": c.get("pagina"), "confianca": j.get("confianca")})
     cols_ia = ["cnpj", "doc_id", "modelo", "origem", "processado_em", "tese", "lastro", "consignado", "pct_consignado",
-               "multicedente", "multissacado", "confianca", "observacoes", "eventos_avaliacao", "eventos_liquidacao"]
+               "multicedente", "multissacado", "confianca", "observacoes", "eventos_avaliacao", "eventos_liquidacao",
+               "benchmark_senior", "foco_precatorio", "precatorio_alimentar"]
     cols_c = ["cnpj", "campo", "valor_num", "valor_txt", "trecho", "pagina", "confianca"]
     return pd.DataFrame(ia, columns=cols_ia), pd.DataFrame(campos, columns=cols_c)
 

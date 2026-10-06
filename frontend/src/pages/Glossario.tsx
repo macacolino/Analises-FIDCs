@@ -75,8 +75,8 @@ export default function Glossario() {
         <div className="card"><h2>Red flags</h2>
           <table className="simple">
             <thead><tr><th>Red flag</th><th>Regra (amarelo / vermelho)</th><th>Ref.</th></tr></thead>
-            <tbody>{cat.data.red_flags.filter((r: Row) => ok(r.nome, r.regra)).map((r: Row) => (
-              <tr key={r.id}><td style={{ width: '30%' }}><b>{r.nome}</b></td><td>{r.regra}</td><td className="muted">{r.codigo}</td></tr>))}</tbody>
+            <tbody>{cat.data.red_flags.filter((r: Row) => ok(r.nome, r.regra, r.definicao)).map((r: Row) => (
+              <tr key={r.id}><td style={{ width: '24%' }}><b>{r.nome}</b></td><td>{r.definicao}<div className="muted" style={{ marginTop: 4 }}>{r.regra}</div></td><td className="muted">{r.codigo}</td></tr>))}</tbody>
           </table>
         </div>
       )}

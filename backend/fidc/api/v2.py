@@ -61,7 +61,7 @@ def catalogo_json():
     return {
         "metricas": [{"metrica": k, "codigo": catalogo.codigo(k), "label": l, "fmt": f, "sentido": s, "bloco": b,
                       "definicao": d} for k, l, f, s, b, d in catalogo.METRICAS],
-        "red_flags": [{"id": i, "codigo": catalogo.codigo(i), "nome": n, "regra": r} for i, n, r in catalogo.RED_FLAGS],
+        "red_flags": [{"id": i, "codigo": catalogo.codigo(i), "nome": n, "regra": r, "definicao": catalogo.RF_DEFINICAO.get(i)} for i, n, r in catalogo.RED_FLAGS],
         "blocos": catalogo.BLOCOS,
         "parametros": [{"chave": k, "label": v[0], "fmt": v[1], "fonte": v[2], "uso": v[3]}
                        for k, v in rot["parametros"].items()],
@@ -690,3 +690,150 @@ def mercado_estrutura(formato: str | None = None):
     pl_abaixo = d[d.status_sub == "abaixo do mínimo"].groupby("categoria").pl.sum()
     out["pl_abaixo"] = out.categoria.map(pl_abaixo).fillna(0)
     return _out(out.sort_values("n_fundos", ascending=False), formato, "Estrutura por categoria")
+
+
+# ------------------------------------------------------------------ comparativo por estratégia (ex.: precatórios)
+COMP_PARAMS = ["taxa_gestao", "taxa_administracao", "taxa_performance", "taxa_minima_cessao", "benchmark_senior"]
+
+
+def comparativo(categorias: list[str]) -> pd.DataFrame:
+    """Uma linha por fundo: rentabilidade 12m por tipo de cota (informe), remuneração implícita vs CDI,
+    estrutura, subordinação, taxas e benchmark (regulamento: manual > IA > regras) e foco do lastro."""
+    ph = ",".join("?" * len(categorias))
+    base = df(f"""
+        WITH ult AS (SELECT ultimo_mes_completo AS dt FROM _meta),
+        s12 AS (
+          SELECT s.cnpj, s.serie, s.tipo, count(*) AS n,
+                 -- 12 meses; com 6 a 11 meses (série renomeada/nova), anualizado
+                 exp(sum(ln(1 + s.rentab_mes / 100)) * 12.0 / count(*)) - 1 AS r12,
+                 max(s.pl_serie) FILTER (WHERE s.dt = (SELECT dt FROM ult)) AS pl_serie
+          FROM serie_mes s JOIN fundo f USING (cnpj)
+          WHERE f.categoria IN ({ph}) AND s.dt > (SELECT dt FROM ult) - INTERVAL 12 MONTH
+            AND s.dt <= (SELECT dt FROM ult) AND s.rentab_mes BETWEEN -60 AND 60   -- fora disso é erro de preenchimento
+          GROUP BY ALL),
+        agg AS (
+          SELECT cnpj, count(*) FILTER (WHERE pl_serie > 1000) AS n_series_pl,
+                 sum(r12 * pl_serie) FILTER (WHERE tipo = 'senior' AND n >= 6 AND pl_serie > 1000)
+                   / nullif(sum(pl_serie) FILTER (WHERE tipo = 'senior' AND n >= 6 AND pl_serie > 1000), 0) AS r12_senior,
+                 sum(r12 * pl_serie) FILTER (WHERE tipo = 'mezanino' AND n >= 6 AND pl_serie > 1000)
+                   / nullif(sum(pl_serie) FILTER (WHERE tipo = 'mezanino' AND n >= 6 AND pl_serie > 1000), 0) AS r12_mezanino,
+                 sum(r12 * pl_serie) FILTER (WHERE tipo = 'subordinada' AND n >= 6 AND pl_serie > 1000)
+                   / nullif(sum(pl_serie) FILTER (WHERE tipo = 'subordinada' AND n >= 6 AND pl_serie > 1000), 0) AS r12_sub,
+                 max(r12) FILTER (WHERE pl_serie > 1000 AND n >= 6) AS r12_unica,
+                 min(n) FILTER (WHERE pl_serie > 1000) AS meses_rentab
+          FROM s12 GROUP BY cnpj),
+        seg AS (
+          SELECT cnpj, coalesce(seg_I1, 0) / nullif(""" + " + ".join(f"coalesce(seg_{x}, 0)" for x in
+                 ["A", "B", "C1", "C2", "C3", "D1", "D2", "D3", "D4", "E", "F1", "F2", "F3", "F4", "F5", "F6", "F7",
+                  "F8", "G", "H1", "H2", "I1", "I2", "I3", "I4", "J", "K"]) + f""", 0) AS pct_precatorios
+          FROM fundo_mes WHERE dt = (SELECT dt FROM ult))
+        SELECT f.cnpj, f.nome, f.gestor, f.admin, f.categoria, f.categoria_nome, f.pl, a.n_series_pl,
+               a.r12_unica, a.r12_senior, a.r12_mezanino, a.r12_sub, a.meses_rentab, k.cdi_12m, g.pct_precatorios
+        FROM fundo f JOIN agg a USING (cnpj) LEFT JOIN seg g USING (cnpj)
+        LEFT JOIN cdi_mes k ON k.dt = (SELECT dt FROM ult)
+        WHERE f.categoria IN ({ph}) AND f.pl > 0""", categorias + categorias)
+    if base.empty:
+        return base
+    for c in ("r12_unica", "r12_senior", "r12_mezanino", "r12_sub"):
+        base[c] = base[c].where(base[c].between(-0.9, 3))
+    base["estrutura"] = base.n_series_pl.map(lambda n: "cota única" if n == 1 else "sênior + subordinada" if n and n > 1 else None)
+    unica = base.estrutura == "cota única"
+    base["rentab_12m_cota_unica"] = base.r12_unica.where(unica)
+    base["rentab_12m_senior"] = base.r12_senior.where(~unica)
+    base["rentab_12m_mezanino"] = base.r12_mezanino.where(~unica)
+    base["rentab_12m_subordinada"] = base.r12_sub.where(~unica)
+    ref = base.rentab_12m_cota_unica.where(unica, base.rentab_12m_senior)
+    base["spread_cdi_12m"] = (1 + ref) / (1 + base.cdi_12m) - 1        # CDI + x (composto)
+    base["pct_cdi_12m"] = ref / base.cdi_12m
+    u = cp.universo()[["cnpj", "subordinacao", "jr_pl", "over90_carteira", "q_status"]]
+    base = base.merge(u, on="cnpj", how="left")
+    # parâmetros do regulamento: manual > IA > regras
+    try:
+        reg = df(f"""SELECT cnpj, campo, valor_num, valor_txt, fonte FROM regulamento_param
+                     WHERE campo IN ({','.join('?' * len(COMP_PARAMS))}) AND cnpj IN (SELECT cnpj FROM fundo
+                     WHERE categoria IN ({ph}))""", COMP_PARAMS + categorias)
+        ia = df(f"""SELECT cnpj, benchmark_senior AS bench_ia, foco_precatorio, precatorio_alimentar
+                    FROM regulamento_ia""")
+        sig = df("""SELECT cnpj, sum(n) FILTER (WHERE sinal = 'prec_federal') AS f,
+                           sum(n) FILTER (WHERE sinal = 'prec_estadual') AS e,
+                           sum(n) FILTER (WHERE sinal = 'prec_alimentar') AS a
+                    FROM regulamento_sinal GROUP BY cnpj""")
+    except Exception:  # noqa: BLE001
+        reg = pd.DataFrame(columns=["cnpj", "campo", "valor_num", "valor_txt", "fonte"])
+        ia = pd.DataFrame(columns=["cnpj", "bench_ia", "foco_precatorio", "precatorio_alimentar"])
+        sig = pd.DataFrame(columns=["cnpj", "f", "e", "a"])
+    with appdb.session() as s:
+        man = pd.DataFrame([dict(r) for r in s.execute(
+            f"""SELECT cnpj, chave AS campo, valor_num, valor_txt FROM fundo_param WHERE chave IN
+                ({','.join('?' * len(COMP_PARAMS))}) ORDER BY competencia DESC""", COMP_PARAMS)],
+            columns=["cnpj", "campo", "valor_num", "valor_txt"]).drop_duplicates(["cnpj", "campo"]).assign(fonte="manual")
+    todos = pd.concat([man, reg], ignore_index=True).drop_duplicates(["cnpj", "campo"])
+    for k in COMP_PARAMS:
+        t = todos[todos.campo == k].set_index("cnpj")
+        col = "valor_txt" if k == "benchmark_senior" else "valor_num"
+        base[k] = base.cnpj.map(t[col])
+        base[f"{k}_fonte"] = base.cnpj.map(t.fonte)
+    base = base.merge(ia, on="cnpj", how="left").merge(sig, on="cnpj", how="left")
+    base["benchmark_senior"] = base.benchmark_senior.where(base.benchmark_senior.notna(), base.bench_ia)
+
+    def foco(r):
+        if isinstance(r.foco_precatorio, str) and r.foco_precatorio != "nao_se_aplica":
+            return {"federal": "federal", "estadual_municipal": "estadual/municipal", "misto": "misto"}[r.foco_precatorio]
+        f = r.f if r.f is not None and not pd.isna(r.f) else 0
+        e = r.e if r.e is not None and not pd.isna(r.e) else 0
+        if f >= 2 and f > e:
+            return "federal (regras)"
+        if e >= 2 and e > f:
+            return "estadual/municipal (regras)"
+        return None
+    base["foco"] = base.apply(foco, axis=1)
+
+    def alim(r):
+        v = r.precatorio_alimentar
+        if v is not None and not pd.isna(v):
+            return "sim" if bool(v) else "não"
+        a = r.a if r.a is not None and not pd.isna(r.a) else 0
+        return "provável (regras)" if a >= 2 else None
+    base["alimentar"] = base.apply(alim, axis=1)
+    cols = ["cnpj", "nome", "gestor", "categoria_nome", "pl", "foco", "alimentar", "pct_precatorios", "estrutura",
+            "rentab_12m_cota_unica", "rentab_12m_senior", "spread_cdi_12m", "pct_cdi_12m", "rentab_12m_mezanino",
+            "rentab_12m_subordinada", "meses_rentab", "cdi_12m", "subordinacao", "jr_pl", "benchmark_senior", "taxa_gestao",
+            "taxa_administracao", "taxa_performance", "taxa_minima_cessao", "over90_carteira", "q_status", "admin",
+            "taxa_gestao_fonte", "taxa_minima_cessao_fonte"]
+    return base[cols].sort_values("pl", ascending=False)
+
+
+@router.get("/comparativo")
+def comparativo_api(categorias: str = "precatorios_federais,precatorios", formato: str | None = None):
+    d = comparativo([c for c in categorias.split(",") if c])
+    return _out(d, formato, "Comparativo",
+                "Rentabilidade 12m: informe CVM (Tab. X.3), séries com 12 meses e PL. Remuneração vs CDI = "
+                "(1 + rentab. 12m) / (1 + CDI 12m) − 1, sobre a cota única ou a sênior. Taxas, benchmark e taxa mínima "
+                "de cessão: regulamento (manual > leitura IA > leitura por regras); benchmark costuma estar no "
+                "suplemento da série e pode faltar.")
+
+
+# ------------------------------------------------------------------ novas oportunidades (captação)
+@router.get("/oportunidades/mercado")
+def oportunidades_mercado(meses: int = 24, formato: str | None = None):
+    from .. import oportunidades as op
+    r = op.mercado(meses)
+    if formato == "xlsx":
+        return _xlsx({"Por categoria": r["resumo"], "Série mensal": r["serie"], "Total": r["total"],
+                      "Excluídos (erro)": r["excluidos"]}, "captacao_mercado")
+    return _clean({"serie": excel.json_safe(r["serie"]), "resumo": excel.json_safe(r["resumo"]),
+                   "total": excel.json_safe(r["total"]), "n_excluidos": len(r["excluidos"])})
+
+
+@router.get("/oportunidades/fundos")
+def oportunidades_fundos(meses: int = 3, categoria: str | None = None, formato: str | None = None):
+    from .. import oportunidades as op
+    return _out(op.fundos(meses, categoria or None), formato, "Fundos captando",
+                "Captação da Tab. X.4 (todas as classes); registros com captação > 1,5x o PL + resgates + amortizações "
+                "excluídos como erro de preenchimento.")
+
+
+@router.get("/oportunidades/novos")
+def oportunidades_novos(meses: int = 6, formato: str | None = None):
+    from .. import oportunidades as op
+    return _out(op.novos(meses), formato, "Fundos novos")

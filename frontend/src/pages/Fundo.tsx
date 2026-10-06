@@ -91,7 +91,7 @@ export default function Fundo() {
             <table className="simple" style={{ marginTop: 10 }}>
               <thead><tr><th>Red flag</th><th>Nível</th><th>Número</th></tr></thead>
               <tbody>{comp.data.red_flags.filter((f: Row) => f.nivel > 0).map((f: Row) => (
-                <tr key={f.id} title={`Regra: ${f.regra}`}><td>{f.nome}</td><td><RedFlagChip nivel={f.nivel} /></td>
+                <tr key={f.id} title={`${f.definicao ?? ''}\n\nRegra: ${f.regra}`}><td style={{ textDecoration: 'underline dotted', cursor: 'help' }}>{f.nome}</td><td><RedFlagChip nivel={f.nivel} /></td>
                   <td className="muted">{f.detalhe}</td></tr>))}</tbody>
             </table>)}
         </div>

@@ -52,8 +52,23 @@ categorias:
       - cotas_fidc_min: 0.5
       - nome_inclui: ['\bFIC\b', 'COTAS DE FUNDOS? DE INVESTIMENTO EM DIREITOS']
 
+  - id: precatorios_federais
+    nome: Precatórios federais
+    grupo: Setor público e judicial
+    regras:
+      - ia_tese: [precatorios, judicial, setor_publico_outros]
+        ia_foco_precatorio: [federal]
+        ia_confianca_min: media
+      - segmento_min: {segmentos: [I1], pct: 0.5}
+        reg_min: {prec_federal: 2}
+        reg_maior: {prec_federal: [prec_estadual]}
+      - nome_inclui: ['PRECAT']
+        reg_min: {prec_federal: 2}
+        reg_maior: {prec_federal: [prec_estadual]}
+      - nome_inclui: ['PRECAT\w* FEDERA', 'FEDERA\w* PRECAT']
+
   - id: precatorios
-    nome: Precatórios
+    nome: Precatórios (estaduais, municipais ou foco não identificado)
     grupo: Setor público e judicial
     regras:
       - segmento_min: {segmentos: [I1], pct: 0.5}
@@ -221,6 +236,15 @@ categorias:
       - nome_inclui: ['CONSIG']
         revisar: true
 
+  # nome explícito de veículos ganha das regras de recebíveis comerciais (ex.: PAN AUTO informa segmento C1)
+  - id: veiculos_nome
+    nome: Veículos
+    grupo: Crédito PF
+    alias_de: veiculos
+    regras:
+      - nome_inclui: ['\bAUTO\b', 'AUTO LOANS', 'VEICUL', 'AUTOMOV']
+        nome_exclui: ['AUTOPECA', 'AUTOMACAO', 'AUTOPISTA']
+
   - id: cartao
     nome: Recebíveis de cartão
     grupo: Crédito PF
@@ -247,6 +271,9 @@ categorias:
       # nenhum cedente listado no informe = nenhum cedente relevante (carteira pulverizada), ex.: MR FIDC
       - segmento_min: {segmentos: [A, C1, C2, C3, D1, H1, H2], pct: 0.5}
         sem_cedente: true
+        nome_exclui: ['\bAUTO', 'VEICUL', 'MOTOS?\b', 'CONSIG', 'CARTAO', 'CARTOES', 'ENERGIA', 'SOLAR', 'IMOB',
+                      '\bAGRO', 'PRECAT', 'JUDICI', 'FGTS', '\bCPR\b', 'LOCACAO', 'ALUGUE']
+        reg_max: {veiculo: 15, consignado: 10, cartao: 10}
         revisar: true
 
   - id: risco_sacado

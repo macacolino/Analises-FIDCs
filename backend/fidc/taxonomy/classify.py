@@ -49,6 +49,7 @@ class Regra:
     ia_consignado: list[str] = field(default_factory=list)
     ia_tese: list[str] = field(default_factory=list)
     ia_confianca_min: str | None = None
+    ia_foco_precatorio: list[str] = field(default_factory=list)
     revisar: bool = False
 
     @classmethod
@@ -71,7 +72,7 @@ class Regra:
             reg_maior=[(a, [b] if isinstance(b, str) else list(b)) for a, b in (d.get("reg_maior") or {}).items()],
             com_regulamento=bool(d.get("com_regulamento", False)),
             ia_consignado=list(d.get("ia_consignado") or []), ia_tese=list(d.get("ia_tese") or []),
-            ia_confianca_min=d.get("ia_confianca_min"),
+            ia_confianca_min=d.get("ia_confianca_min"), ia_foco_precatorio=list(d.get("ia_foco_precatorio") or []),
             revisar=bool(d.get("revisar", False)),
         )
 
@@ -105,6 +106,8 @@ class Regra:
             v = f.get(campo)
             if v is None or pd.isna(v) or (v < lim if maior else v > lim):
                 return False
+        if self.ia_foco_precatorio and f.get("ia_foco_precatorio") not in self.ia_foco_precatorio:
+            return False
         if self.ia_consignado or self.ia_tese or self.ia_confianca_min:
             if not f.get("ia_tese"):   # sem leitura por IA
                 return False
@@ -211,7 +214,8 @@ def _sinais_regulamento(con) -> pd.DataFrame | None:
 def _leitura_ia(con) -> pd.DataFrame | None:
     try:
         d = con.execute("""SELECT cnpj, tese AS ia_tese, consignado AS ia_consignado, confianca AS ia_confianca,
-                                  multicedente AS ia_multicedente, multissacado AS ia_multissacado
+                                  multicedente AS ia_multicedente, multissacado AS ia_multissacado,
+                                  foco_precatorio AS ia_foco_precatorio
                            FROM regulamento_ia""").df()
     except Exception:  # noqa: BLE001 - base sem leitura por IA
         return None

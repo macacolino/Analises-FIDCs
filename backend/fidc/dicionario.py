@@ -97,7 +97,7 @@ def _merge_catalogo() -> None:
     for key, label, fmt, _sentido, _bloco, defin in catalogo.METRICAS:
         D.setdefault(key, (label, fmt, defin))
     for key, nome, regra in catalogo.RED_FLAGS:
-        D.setdefault(key, (nome, "int", regra))
+        D.setdefault(key, (nome, "int", regra + " " + catalogo.RF_DEFINICAO.get(key, "")))
     D.update({
         "jr": ("PL Jr", "brl", ""), "mz": ("PL mezanino", "brl", ""), "sr": ("PL sênior", "brl", ""),
         "q_status": ("Qualidade do dado", "txt", "ok / alerta / erro pelas checagens de consistência"),
@@ -127,6 +127,41 @@ def _merge_catalogo() -> None:
         "desempenho_real": ("Desempenho real", "pct100", ""), "desempenho_esperado": ("Desempenho esperado", "pct100", ""),
         "tipo": ("Tipo de cota", "txt", "senior, mezanino ou subordinada (júnior), lido do nome da série"),
         "serie": ("Série / subclasse", "txt", ""),
+        # oportunidades / captação
+        "captacao": ("Captação", "brl", "Subscrições no período (Tab. X.4, todas as classes)"),
+        "cap_senior": ("Captação sênior", "brl", ""), "cap_mezanino": ("Captação mezanino", "brl", ""),
+        "cap_sub": ("Captação subordinada", "brl", ""), "resgates": ("Resgates", "brl", ""),
+        "amortizacoes": ("Amortizações", "brl", ""), "liquida": ("Captação líquida", "brl",
+                                                                 "Captação − resgates − amortizações"),
+        "captacao_pct_pl": ("Captação / PL", "pct", ""), "meses_captando": ("Meses com captação", "int", ""),
+        "novo": ("Fundo novo (≤ 6 meses)", "txt", ""), "primeiro_informe": ("1º informe", "data", ""),
+        "lastro": ("Lastro (regulamento)", "txt", "Resumo do lastro lido no regulamento (IA)"),
+        "cap_media_3m": ("Captação média 3m", "brl", "Média mensal dos últimos 3 meses"),
+        "cap_media_12m_ant": ("Captação média 12m anteriores", "brl", "Média mensal dos 12 meses antes dos últimos 3"),
+        "aceleracao": ("Aceleração da captação", "pct", "Média 3m / média dos 12m anteriores − 1"),
+        "liquida_3m": ("Captação líquida 3m", "brl", ""), "novos_3m": ("Fundos novos 3m", "int", ""),
+        "captacao_12m": ("Captação 12m", "brl", ""), "liquida_12m": ("Captação líquida 12m", "brl", ""),
+        "novos_12m": ("Fundos novos 12m", "int", ""),
+        # comparativo por estratégia
+        "foco": ("Foco do lastro", "txt", "Precatórios: federal ou estadual/municipal (leitura IA; '(regras)' = leitura por texto)"),
+        "alimentar": ("Alimentar", "txt", "Foco em precatórios de natureza alimentar"),
+        "pct_precatorios": ("% em precatórios", "pct", "Segmento I1 (precatórios) da Tab. II / carteira"),
+        "estrutura": ("Estrutura", "txt", "Cota única = uma só série com PL; senão sênior + subordinada"),
+        "rentab_12m_cota_unica": ("Rentab. 12m cota única", "pct", "Tab. X.3; anualizada se a série tem 6-11 meses"),
+        "rentab_12m_senior": ("Rentab. 12m sênior", "pct", "Média ponderada pelo PL das séries sênior"),
+        "rentab_12m_mezanino": ("Rentab. 12m mezanino", "pct", ""),
+        "rentab_12m_subordinada": ("Rentab. 12m subordinada", "pct", ""),
+        "spread_cdi_12m": ("Remuneração vs CDI (CDI + x)", "pct",
+                           "(1 + rentab. 12m da cota única ou sênior) / (1 + CDI 12m) − 1"),
+        "pct_cdi_12m": ("% do CDI 12m", "pct", "Rentab. 12m / CDI 12m"),
+        "meses_rentab": ("Meses na conta", "int", "Meses de histórico da série usados (12 = completo)"),
+        "cdi_12m": ("CDI 12m", "pct", ""),
+        "benchmark_senior": ("Benchmark da sênior", "txt", "Regulamento/suplemento (pode faltar: costuma estar no suplemento)"),
+        "taxa_gestao": ("Taxa de gestão", "pct", "% a.a. do PL (regulamento)"),
+        "taxa_administracao": ("Taxa de administração", "pct", "% a.a. do PL (regulamento)"),
+        "taxa_performance": ("Taxa de performance", "pct", "% do que exceder o benchmark (regulamento)"),
+        "taxa_minima_cessao": ("Taxa mínima de cessão", "pct", "Regulamento (a.m. ou a.a. conforme o texto)"),
+        "taxa_gestao_fonte": ("Fonte taxa de gestão", "txt", ""), "taxa_minima_cessao_fonte": ("Fonte taxa mín. cessão", "txt", ""),
         # estrutura x regulamento
         "status_sub": ("Subordinação vs mínimo", "txt", "abaixo do mínimo / folga < 3 p.p. / ok / sem mínimo"),
         "sub_min_senior": ("Subordinação mínima", "pct", "Mínimo exigido pelo regulamento (manual > IA > regras > referência da categoria)"),

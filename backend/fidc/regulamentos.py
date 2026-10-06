@@ -42,7 +42,7 @@ GLIFOS_SEED = Path(__file__).parent / "seed" / "glifos.json"
 GLIFOS = DIR / "glifos_aprendidos.json"
 SEED = Path(__file__).parent / "seed" / "regulamentos.json.gz"   # resultado versionado no repositório (sem os textos)
 DOWNLOAD = f"{config.FNET_BASE}/downloadDocumento?id={{}}"
-VERSAO_REGRAS = 6   # mude quando as regras de leitura mudarem: força reprocessar o texto já baixado
+VERSAO_REGRAS = 7   # mude quando as regras de leitura mudarem: força reprocessar o texto já baixado
 LIMITE_DIARIO = 150   # regulamentos novos lidos por execução do ETL diário
 
 SCHEMA = """
@@ -231,7 +231,13 @@ SINAIS = {
                       r"credito do trabalhador|15\.179|1\.292|empresas privadas|empregador(?:es|as?)?\b(?! rural)|carteira de trabalho",
     "dataprev": r"dataprev", "fgts": r"\bfgts\b|saque.aniversario",
     # outros lastros
-    "precatorio": r"precatori", "duplicata": r"duplicata", "cheque": r"\bcheques?\b", "ccb": r"\bccb\b|cedulas? de credito bancario",
+    "precatorio": r"precatori",
+    # foco do precatório (a frase-padrão "precatórios federais, monitorar e informar" não conta)
+    "prec_federal": r"precatorios? (de natureza alimentar )?(alimentares )?federa(?:is|l)(?!, monitorar)|\buniao federal\b|"
+                    r"tribuna(?:l|is) regiona(?:l|is) federa|justica federal|\btrf ?\d",
+    "prec_estadual": r"precatorios? (estaduais|municipais|de estados|de municipios)|estados?, (do )?distrito federal e "
+                     r"(dos )?municipios|tribuna(?:l|is) de justica",
+    "prec_alimentar": r"natureza alimentar|precatorios? alimentares|creditos? alimentares", "duplicata": r"duplicata", "cheque": r"\bcheques?\b", "ccb": r"\bccb\b|cedulas? de credito bancario",
     "cartao": r"cartao de credito|cartoes de credito|arranjos? de pagamento", "veiculo": r"veiculo",
     "imobiliario": r"imobiliari|alugue", "agro": r"\bcpr\b|agronegocio|produtor rural",
     "judicial": r"acoes? judicia|direitos? creditorios? judicia|processos? judicia",
@@ -329,6 +335,33 @@ def campos(paginas: list[str]) -> list[dict]:
         v, s, pg = min(lst, key=lambda x: x[0])
         conf = "alta" if len({round(x[0], 4) for x in lst}) == 1 else "media"
         put(campo, v, None, s, pg, conf)
+    # --- taxas, taxa mínima de cessão e benchmark da sênior (costuma estar no suplemento: cobertura parcial)
+    for pg, s_ in sents:
+        n = _norm(s_)
+        m = re.search(_PCT, s_)
+        if m and re.search(r"ao ano|a\.a\.|anual", n):
+            v = _num(m.group(1)) / 100
+            if 0 <= v < 0.1:
+                if "taxa de gestao" in n:
+                    put("taxa_gestao", v, None, s_, pg)
+                elif "taxa de administracao" in n and "gestao" not in n.split("taxa de administracao")[0][-80:]:
+                    put("taxa_administracao", v, None, s_, pg)
+        if "taxa de performance" in n and m and not re.search(r"nao (sera|ha|havera) (cobrada )?taxa de performance|"
+                                                                r"nao sera cobrada", n):
+            v = _num(m.group(1)) / 100
+            if 0 < v <= 0.5:
+                put("taxa_performance", v, None, s_, pg, "baixa")
+        if re.search(r"taxa (minima de (cessao|aquisicao|desconto)|de (cessao|desconto) minima)", n) and m:
+            v = _num(m.group(1)) / 100
+            if 0 < v < 2:
+                put("taxa_minima_cessao", v, None, s_, pg)
+        if re.search(r"benchmark|meta de rentabilidade|rentabilidade alvo|remuneracao (alvo|das cotas)", n) and \
+                re.search(r"senior", n):
+            b = re.search(r"(?i)(\d{2,3}(?:,\d+)?\s?%\s?(?:\(.*?\)\s?)?(?:do|da)\s(?:taxa\s)?(?:CDI|DI))|"
+                          r"((?:CDI|DI|IPCA|IGP-?M|SELIC)[^.;]{0,40}?(?:\+|acrescid[ao] de|mais)\s?(?:spread de\s)?"
+                          r"\d+(?:,\d+)?\s?%)", s_)
+            if b:
+                put("benchmark_senior", None, re.sub(r"\s+", " ", b.group(0))[:80], s_, pg, "baixa")
     # --- responsabilidade: conta as duas formas (o termo de ciência de responsabilidade ilimitada é citado mesmo
     # em classe limitada quando o regulamento prevê as duas)
     tudo = _norm(" ".join(paginas))
@@ -435,11 +468,14 @@ def _salvar(con, cnpj, meta, cs=None, ss=None):
         con.commit()
 
 
-def reler_textos() -> int:
+def reler_textos(cnpjs: list[str] | None = None) -> int:
     """Reaplica as regras de leitura aos textos já baixados (sem acessar o FNET)."""
     con = db()
     n = 0
-    for (cnpj,) in con.execute("SELECT cnpj FROM reg_doc WHERE status IN ('ok', 'ilegivel')").fetchall():
+    todos = con.execute("SELECT cnpj FROM reg_doc WHERE status IN ('ok', 'ilegivel')").fetchall()
+    for (cnpj,) in todos:
+        if cnpjs is not None and cnpj not in cnpjs:
+            continue
         f = DIR / f"{cnpj}.json.gz"
         if not f.exists():
             continue
@@ -592,7 +628,7 @@ def main():
         print(exportar_seed())
         return
     if a.reler:
-        print({"relidos": reler_textos()})
+        print({"relidos": reler_textos(a.cnpj or None)})
         return
     itens = [(c, c) for c in a.cnpj] if a.cnpj else fila(a.limite)
     print(rodar(itens, a.workers))

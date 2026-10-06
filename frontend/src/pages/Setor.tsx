@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { send, useApi, useTaxonomia, type Row } from '../api'
 import { Bars, RankBars, TimeLines } from '../components/Charts'
+import { Comparativo } from '../components/Comparativo'
 import { DataGrid } from '../components/DataGrid'
 import { Kpi, Loading, Tabs } from '../components/ui'
 import { fmtValue, mesAno } from '../fmt'
@@ -18,7 +19,7 @@ export default function Setor() {
   const nav = useNavigate()
   const tax = useTaxonomia()
   const setor = useApi<{ historico: Row[]; aging: Row[] }>(`/api/setores/${categoria}`)
-  const [tab, setTab] = useState<'fundos' | 'series' | 'safra' | 'bcb' | 'orig' | 'gest' | 'rf' | 'dist' | 'estr'>('fundos')
+  const [tab, setTab] = useState<'fundos' | 'series' | 'safra' | 'bcb' | 'orig' | 'gest' | 'rf' | 'dist' | 'estr' | 'comp'>('fundos')
   const [tipoSerie, setTipoSerie] = useState('')
   const [safraMetrica, setSafraMetrica] = useState('inad_90')
   const rankUrl = `/api/setores/${categoria}/ranking`
@@ -100,7 +101,7 @@ export default function Setor() {
         </div>
       )}
       <div className="card">
-        <Tabs value={tab} onChange={setTab} options={[['fundos', 'Ranking de fundos'], ['estr', 'Estrutura x regulamento'], ['dist', 'Distribuição'], ['series', 'Ranking de séries'], ['rf', 'Red flags do setor'], ['bcb', 'Mercado (Banco Central)'], ['orig', 'Originadores / cedentes'], ['gest', 'Gestores'], ['safra', 'Safra de fundos']]} />
+        <Tabs value={tab} onChange={setTab} options={[['fundos', 'Ranking de fundos'], ['comp', 'Comparativo (rentab., taxas)'], ['estr', 'Estrutura x regulamento'], ['dist', 'Distribuição'], ['series', 'Ranking de séries'], ['rf', 'Red flags do setor'], ['bcb', 'Mercado (Banco Central)'], ['orig', 'Originadores / cedentes'], ['gest', 'Gestores'], ['safra', 'Safra de fundos']]} />
         {tab === 'fundos' && (
           <DataGrid rows={ranking.data} exportUrl={rankUrl} height={560}
             cols={['nome', 'gestor', { field: 'pl', sort: 'desc' }, 'inad_90', 'inad_contratos', 'pdd_carteira',
@@ -122,10 +123,11 @@ export default function Setor() {
         {tab === 'orig' && <SetorTabela url={`/api/setores/${categoria}/originadores`} cols={['nome_cedente', 'cedente', 'n_fundos', 'exposicao_estimada', 'maior_pct', { field: 'fundos', width: 500 }]}
           nota="Cedentes declarados na Tab. I do informe (até 9 por fundo). Nomes pela Receita (BrasilAPI). Exposição = % do cedente × carteira bruta do fundo - estimativa." />}
         {tab === 'gest' && <SetorTabela url={`/api/setores/${categoria}/gestores`} cols={['nome', 'n_fundos', 'pl_total', 'over90_mediana', 'subordinacao_mediana', 'retorno_jr_mediana']} />}
-        {tab === 'rf' && <SetorTabela url={`/api/setores/${categoria}/redflags`} cols={['red_flag', { field: 'regra', width: 380 }, 'n_fundos', 'amarelo', 'vermelho', 'pct_com_flag', 'pl_com_flag']}
+        {tab === 'rf' && <SetorTabela url={`/api/setores/${categoria}/redflags`} cols={[{ field: 'red_flag', headerName: 'Red flag', minWidth: 260, tooltipValueGetter: (p: any) => `${p.data?.definicao ?? ''}\n\nRegra: ${p.data?.regra ?? ''}` }, { field: 'regra', headerName: 'Regra (A = amarelo, V = vermelho)', width: 520, wrapText: true, autoHeight: true, tooltipValueGetter: (p: any) => p.data?.definicao }, 'n_fundos', 'amarelo', 'vermelho', 'pct_com_flag', 'pl_com_flag']}
           nota="Fundos da categoria no mês de referência; red flags calculadas pelo informe (biblioteca MCMS)." />}
         {tab === 'dist' && <Distribuicao categoria={categoria} />}
         {tab === 'estr' && <Estrutura categoria={categoria} />}
+        {tab === 'comp' && <Comparativo categoria={categoria} />}
         {tab === 'safra' && (
           <div className="stack">
             <div className="row">

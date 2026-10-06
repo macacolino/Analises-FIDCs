@@ -103,6 +103,23 @@ O regulamento vigente de cada fundo é baixado do FNET (B3) — **gratuito, sem 
 - PDFs sem texto (escaneados) ficam como "ilegível". PDFs com fonte Calibri sem tabela de caracteres são decodificados
   por um mapa de glifos aprendido dos próprios regulamentos.
 
+## Novas oportunidades, comparativo e agendamento
+- **Oportunidades**: captação, resgates e amortizações por mês (Tab. X.4), por categoria (com "aceleração" = média
+  dos últimos 3 meses vs 12 anteriores), fundos que mais captaram (1/3/6/12 meses) e fundos novos, com o lastro lido
+  no regulamento. Captação maior que 1,5x o PL + resgates + amortizações é tratada como erro de preenchimento.
+- **Comparativo por estratégia** (Mercado e aba do setor): rentabilidade 12m da cota única, sênior, mezanino e
+  subordinada; remuneração vs CDI; subordinação; taxas de gestão/administração/performance, taxa mínima de cessão e
+  benchmark (regulamento: manual > IA > regras); foco federal/estadual e alimentar para precatórios. Categoria
+  "Precatórios federais" separada dos estaduais/municipais.
+- **Regulamentos de madrugada (no app)**: `FIDC_REGULAMENTOS_HORA` (padrão 3h; -1 desliga) baixa e lê por regras até
+  `FIDC_REGULAMENTOS_LIMITE` (300) regulamentos novos e, com `ANTHROPIC_API_KEY`, lê por IA até `FIDC_IA_LIMITE` (200).
+  Só roda se o app estiver no ar no horário (o Codespace dorme quando fica parado; num servidor fica sempre ligado).
+- **Leitura por IA com o limite do plano Claude** (sem chave): `python -m fidc.agente_sessao preparar --limite 250`
+  monta o lote; uma sessão do Claude Code lança um agente por lista; `python -m fidc.agente_sessao importar` valida e
+  importa. Prioridade: precatórios, multicedente, sem carteira, demais por PL.
+- **Tabelas**: busca geral (sem acento) e filtro sob cada coluna na unidade exibida: `>5`, `<=1,5`, `5-10` (percentuais
+  em %, valores em R$ milhões), texto, `a|b` (ou), `-termo` (exclui).
+
 ## Páginas
 | Página | O que tem |
 |---|---|

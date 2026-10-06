@@ -34,7 +34,16 @@ def test_fgts_vem_antes_de_consignado():
 
 def test_precatorio_por_segmento_e_por_nome():
     assert cat(I1=0.8) == "precatorios"
-    assert cat(nome="FIDC PRECATORIOS FEDERAIS", F8=1.0) == "precatorios"
+    assert cat(nome="FIDC PRECATORIOS FEDERAIS", F8=1.0) == "precatorios_federais"
+    assert cat(nome="FIDC PRECATORIOS ESTADUAIS", F8=1.0) == "precatorios"
+
+
+def test_precatorio_federal_pelo_regulamento():
+    f = feat(nome="FIDC XPTO", I1=1.0)
+    f.update(tem_reg=True, reg_precatorio=30, reg_prec_federal=6, reg_prec_estadual=1)
+    assert classify.classify_one(f, CATS)[0].id == "precatorios_federais"
+    f.update(reg_prec_federal=1, reg_prec_estadual=5)
+    assert classify.classify_one(f, CATS)[0].id == "precatorios"
 
 
 def test_multicedente_por_concentracao():

@@ -156,6 +156,7 @@ def comparar(cnpj: str, ignorar_sem_vencido: bool = True, **kw) -> dict:
         lvl = None if lvl is None or (isinstance(lvl, float) and math.isnan(lvl)) else int(lvl)
         pct_pares = float((pares[col] >= 1).mean()) if len(pares) else None
         rfs.append({"id": col, "codigo": catalogo.codigo(col), "nome": nome, "regra": regra, "nivel": lvl,
+                    "definicao": catalogo.RF_DEFINICAO.get(col),
                     "detalhe": detalhe_rf(col, row), "pct_pares_com_flag": pct_pares})
     return {
         "fundo": {"cnpj": cnpj, "nome": row["nome"], "dt": str(row["dt"])[:10], "categoria": row["categoria_nome"],
@@ -343,7 +344,8 @@ def red_flags_setor(categoria: str | None) -> pd.DataFrame:
     rows = []
     for col, nome, regra in catalogo.RED_FLAGS:
         v = u[col].dropna()
-        rows.append({"id": col, "red_flag": nome, "regra": regra, "n_fundos": len(v),
+        rows.append({"id": col, "red_flag": nome, "regra": regra, "definicao": catalogo.RF_DEFINICAO.get(col),
+                     "n_fundos": len(v),
                      "amarelo": int((v == 1).sum()), "vermelho": int((v == 2).sum()),
                      "pct_com_flag": float((v >= 1).mean()) if len(v) else None,
                      "pl_com_flag": float(u.loc[u[col] >= 1, "pl"].sum())})

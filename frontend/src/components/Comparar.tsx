@@ -176,7 +176,7 @@ export default function ComparePanel({ cnpj, peers }: { cnpj: string; peers: Pee
         <table className="simple">
           <thead><tr><th>Red flag</th><th>Fundo</th><th>Número do fundo</th><th>Regra</th><th className="r">% dos pares com flag</th></tr></thead>
           <tbody>{d.red_flags.map((f: Row) => (
-            <tr key={f.id} title={f.codigo}><td>{f.nome}</td><td><RedFlagChip nivel={f.nivel} /></td><td>{f.detalhe}</td>
+            <tr key={f.id} title={`${f.definicao ?? ''}\n\n${f.regra}`}><td style={{ textDecoration: 'underline dotted', cursor: 'help' }}>{f.nome}</td><td><RedFlagChip nivel={f.nivel} /></td><td>{f.detalhe}</td>
               <td className="muted">{f.regra}</td><td className="r">{fmtValue(f.pct_pares_com_flag, 'pct')}</td></tr>))}</tbody>
         </table>
         <p className="muted">RF03, RF05, RF07, RF11–RF13, RF18, RF20–RF22 e RF25 dependem de regulamento, relatório do gestor ou notícias: ficam no Roteiro de DD.</p>

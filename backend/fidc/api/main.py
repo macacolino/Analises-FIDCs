@@ -36,6 +36,7 @@ async def lifespan(_app):
         log.exception("falha ao carregar grupos iniciais")
     if os.environ.get("FIDC_AGENDADOR", "1") == "1":
         threading.Thread(target=_agendador, daemon=True).start()
+        threading.Thread(target=_agendador_regulamentos, daemon=True).start()
     yield
 
 
@@ -325,6 +326,33 @@ def _agendador():
         time.sleep((prox - agora).total_seconds())
         _run_etl(True)
         _bimestral()
+
+
+def _agendador_regulamentos():
+    """Regulamentos de madrugada (FIDC_REGULAMENTOS_HORA, padrão 3h): baixa e lê por regras os regulamentos novos
+    (até FIDC_REGULAMENTOS_LIMITE, padrão 300) e, se houver ANTHROPIC_API_KEY, lê por IA os novos/alterados
+    (até FIDC_IA_LIMITE, padrão 200). Reconstrói a base no fim. FIDC_REGULAMENTOS_HORA=-1 desliga."""
+    hora = int(os.environ.get("FIDC_REGULAMENTOS_HORA", "3"))
+    if hora < 0:
+        return
+    while True:
+        agora = datetime.now()
+        prox = agora.replace(hour=hora, minute=0, second=0, microsecond=0)
+        if prox <= agora:
+            prox += timedelta(days=1)
+        time.sleep((prox - agora).total_seconds())
+        try:
+            from .. import agente_regulamento, regulamentos
+            itens = regulamentos.fila(int(os.environ.get("FIDC_REGULAMENTOS_LIMITE", "300")))
+            if itens:
+                regulamentos.rodar(itens, workers=3)
+            if os.environ.get("ANTHROPIC_API_KEY"):
+                pend = agente_regulamento.pendentes(int(os.environ.get("FIDC_IA_LIMITE", "200")))
+                if pend:
+                    agente_regulamento.lote(pend)
+            _run_etl(False)
+        except Exception as e:  # noqa: BLE001
+            logging.getLogger(__name__).warning("rotina noturna de regulamentos falhou: %s", e)
 
 
 def _bimestral():
