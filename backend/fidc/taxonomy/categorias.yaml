@@ -20,6 +20,12 @@
 #   sem_cedente: true -> o informe não lista nenhum cedente (ninguém relevante: típico de carteira pulverizada)
 #   pmr_min / pmr_max: prazo médio a vencer da carteira, em dias (faixas da Tab. V/VI)
 #   taxa_min / taxa_max: taxa média de aquisição da Tab. IX, % a.a. (só quando entre 12% e 100%)
+#   reg_min:   {sinal: n, ...}  o regulamento vigente (FNET) menciona o sinal pelo menos n vezes
+#   reg_max:   {sinal: n, ...}  ... no máximo n vezes (fundo sem regulamento lido passa)
+#   com_regulamento: true   só vale para fundo com regulamento lido
+#   reg_maior: {sinal: [outros]} o sinal aparece mais que a soma dos outros
+#              ("a+b" soma sinais). Sinais em backend/fidc/regulamentos.py (SINAIS): consignado,
+#              consig_inss, consig_servidor, consig_privado, fgts, precatorio, duplicata, ccb, cartao...
 #   revisar: true  -> marca o fundo para revisão manual (classificação de baixa confiança)
 #
 # Segmentos da Tabela II (informe mensal CVM):
@@ -81,7 +87,61 @@ categorias:
       - nome_inclui: ['CONSIGNADO PRIVADO', '\bCLT\b', 'TRABALHADOR', 'E-?CONSIGNADO']
       - segmento_min: {segmentos: [F2], pct: 0.5}
         nome_inclui: ['PRIVADO', '\bCLT\b', 'TRABALHADOR', 'EMPRESA']
-      # heurística (revisar): consignado sem pista no nome, com carteira curta ou taxa alta = perfil do privado
+
+  # ---- regulamento (FNET): a tese escrita no regulamento vale mais que a heurística de prazo/taxa
+  - id: consignado_privado_reg
+    nome: Consignado privado
+    grupo: Consignado
+    alias_de: consignado_privado
+    regras:
+      - segmento_min: {segmentos: [F2], pct: 0.5}
+        reg_min: {consignado: 3, consig_privado: 3}
+        reg_maior: {consig_privado: [consig_inss, consig_servidor]}
+      # fora do segmento consignado da Tab. II: só com o regulamento claramente de consignado privado
+      - reg_min: {consignado: 10, consig_privado: 10}
+        reg_maior: {consig_privado: [consig_inss, consig_servidor]}
+        revisar: true
+
+  - id: consignado_publico_reg
+    nome: Consignado público
+    grupo: Consignado
+    alias_de: consignado_publico
+    regras:
+      - segmento_min: {segmentos: [F2], pct: 0.5}
+        reg_min: {consignado: 3, consig_inss+consig_servidor: 3}
+        reg_maior: {consig_inss+consig_servidor: [consig_privado]}
+      - reg_min: {consignado: 10, consig_inss+consig_servidor: 10}
+        reg_maior: {consig_inss+consig_servidor: [consig_privado]}
+        revisar: true
+
+  # segmento consignado na Tab. II mas o regulamento não fala de consignado: provável erro de enquadramento
+  - id: credito_pessoal_reg
+    nome: Crédito pessoal / CDC
+    grupo: Crédito PF
+    alias_de: credito_pessoal
+    regras:
+      - segmento_min: {segmentos: [F2], pct: 0.5}
+        reg_max: {consignado: 2}
+        reg_min: {ccb: 1}
+        revisar: true
+
+  - id: outros_reg
+    nome: Outros / não classificado
+    grupo: Outros
+    alias_de: outros
+    regras:
+      - segmento_min: {segmentos: [F2], pct: 0.5}
+        com_regulamento: true
+        reg_max: {consignado: 2}
+        revisar: true
+
+  # ---- heurísticas (sem regulamento lido ou regulamento ambíguo): revisar
+  - id: consignado_privado_heur
+    nome: Consignado privado
+    grupo: Consignado
+    alias_de: consignado_privado
+    regras:
+      # consignado sem pista no nome, com carteira curta ou taxa alta = perfil do privado
       - segmento_min: {segmentos: [F2], pct: 0.5}
         nome_exclui: ['INSS', 'PUBLICO', 'SERVIDOR', 'SIAPE', 'FGTS']
         pmr_max: 450
@@ -96,7 +156,7 @@ categorias:
     grupo: Consignado
     alias_de: consignado_publico
     regras:
-      # heurística (revisar): carteira longa ou taxa baixa = perfil de INSS / servidor
+      # carteira longa ou taxa baixa = perfil de INSS / servidor
       - segmento_min: {segmentos: [F2], pct: 0.5}
         nome_exclui: ['PRIVADO', '\bCLT\b', 'TRABALHADOR']
         pmr_min: 550

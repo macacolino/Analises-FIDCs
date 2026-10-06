@@ -53,7 +53,38 @@ def test_consignado_por_prazo_e_taxa():
     assert cat(nome="FIDC XPTO", F2=1.0) == "consignado_indefinido"
     f = feat(nome="FIDC XPTO", F2=1.0)
     f.update(pmr=300, taxa_ix=None)
-    assert classify.classify_one(f, CATS)[0].id == "consignado_privado"
+    c = classify.classify_one(f, CATS)[0]
+    assert (c.alias_de or c.id) == "consignado_privado"
+
+
+def _reg(nome="FIDC XPTO", **sinais):
+    f = feat(nome=nome, F2=1.0)
+    f.update(pmr=760, taxa_ix=None, tem_reg=True, **{f"reg_{k}": v for k, v in sinais.items()})
+    c = classify.classify_one(f, CATS)[0]
+    return c.alias_de or c.id
+
+
+def test_regulamento_define_publico_ou_privado():
+    # prazo longo sugeriria público, mas o regulamento é de consignado privado: regulamento ganha da heurística
+    assert _reg(consignado=40, consig_privado=30, consig_inss=2) == "consignado_privado"
+    assert _reg(consignado=40, consig_inss=50, consig_privado=3) == "consignado_publico"
+    assert _reg(consignado=40, consig_servidor=20, consig_inss=0, consig_privado=3) == "consignado_publico"
+    # o nome explícito continua ganhando do regulamento
+    assert _reg(nome="CAJU CONSIGNADO PRIVADO FIDC", consignado=40, consig_inss=90, consig_privado=5) == "consignado_privado"
+
+
+def test_regulamento_sem_consignado_tira_da_categoria():
+    assert _reg(consignado=0, ccb=20) == "credito_pessoal"
+    assert _reg(consignado=1) == "outros"
+
+
+def test_consignado_escondido_em_outro_segmento():
+    f = feat(nome="FIDC XPTO", F8=1.0)
+    f.update(tem_reg=True, reg_consignado=30, reg_consig_privado=25)
+    c = classify.classify_one(f, CATS)[0]
+    assert (c.alias_de or c.id) == "consignado_privado"
+    f.update(reg_consignado=5, reg_consig_privado=5)   # menção lateral não basta
+    assert classify.classify_one(f, CATS)[0].id == "financeiro_outros"
 
 
 def test_fic_e_sem_carteira():

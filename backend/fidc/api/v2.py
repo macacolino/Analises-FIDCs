@@ -196,10 +196,25 @@ def del_param(cnpj: str, chave: str, competencia: str = ""):
     return {"ok": True}
 
 
+def _campos_extraidos(cnpj: str) -> list[dict]:
+    try:
+        return df("""SELECT campo, valor_num, valor_txt, trecho, pagina, confianca FROM regulamento_campo
+                     WHERE cnpj = ?""", [consultas.cnpj_digits(cnpj)]).to_dict("records")
+    except Exception:  # noqa: BLE001 - base sem a tabela
+        return []
+
+
 def _param_atual(cnpj: str) -> dict[str, dict]:
+    """Valor manual (mais recente) e, na falta dele, o extraído automaticamente do regulamento."""
     out: dict[str, dict] = {}
     for p in params(cnpj):  # ordenado por competência desc: o primeiro de cada chave é o mais recente
         out.setdefault(p["chave"], p)
+    for c in _campos_extraidos(cnpj):
+        if c["campo"] not in out and (c["valor_num"] is not None and pd.notna(c["valor_num"]) or c["valor_txt"]):
+            pg = c["pagina"]
+            out[c["campo"]] = {"chave": c["campo"], "valor_num": c["valor_num"], "valor_txt": c["valor_txt"],
+                               "fonte": "regulamento (extração automática" + (f", p. {int(pg)})" if pd.notna(pg) else ")"),
+                               "auto": True}
     return out
 
 
@@ -243,6 +258,43 @@ def derivados_regulamento(cnpj: str) -> list[dict]:
 @router.get("/fundos/{cnpj}/regulamento")
 def regulamento(cnpj: str):
     return _clean(derivados_regulamento(cnpj))
+
+
+TESES = [  # rótulo, sinais que somam a favor
+    ("Consignado INSS", ["consig_inss"]), ("Consignado servidor público", ["consig_servidor"]),
+    ("Consignado privado (CLT)", ["consig_privado"]), ("FGTS", ["fgts"]), ("Precatórios", ["precatorio"]),
+    ("Duplicatas / recebíveis comerciais", ["duplicata", "cheque"]), ("Cartão", ["cartao"]),
+    ("Veículos", ["veiculo"]), ("Imobiliário", ["imobiliario"]), ("Agro", ["agro"]), ("Judicial", ["judicial"]),
+]
+
+
+@router.get("/fundos/{cnpj}/regulamento/extraido")
+def regulamento_extraido(cnpj: str):
+    """Regulamento vigente no FNET lido por regras: campos com trecho e página, sinais da tese e divergência
+    com a categoria atribuída pelo informe."""
+    c = consultas.cnpj_digits(cnpj)
+    try:
+        doc = df("SELECT * FROM regulamento WHERE cnpj = ?", [c]).to_dict("records")
+        sig = df("SELECT sinal, n FROM regulamento_sinal WHERE cnpj = ? ORDER BY n DESC", [c]).to_dict("records")
+    except Exception:  # noqa: BLE001
+        doc, sig = [], []
+    if not doc:
+        return {"status": "nao_processado"}
+    d = doc[0]
+    manual = {p["chave"] for p in params(c)}
+    pcat = yaml.safe_load(open(ROTEIROS_FILE, encoding="utf-8"))["parametros"]
+    campos = []
+    for x in _campos_extraidos(c):
+        meta = pcat.get(x["campo"])
+        campos.append({**x, "label": meta[0] if meta else x["campo"], "fmt": meta[1] if meta else "txt",
+                       "parametro": bool(meta), "tem_manual": x["campo"] in manual})
+    n = {s["sinal"]: s["n"] for s in sig}
+    teses = sorted(((rot, sum(n.get(k, 0) for k in ks)) for rot, ks in TESES), key=lambda t: -t[1])
+    teses = [{"tese": t, "mencoes": v} for t, v in teses if v > 0]
+    doc_id = d.get("doc_id")
+    return _clean({**d, "url_pdf": f"{config.FNET_BASE}/downloadDocumento?id={int(doc_id)}" if doc_id else None,
+                   "url_ver": f"{config.FNET_BASE}/exibirDocumento?id={int(doc_id)}&cvm=true" if doc_id else None,
+                   "campos": campos, "sinais": sig, "teses": teses})
 
 
 # ------------------------------------------------------------------ roteiro de DD

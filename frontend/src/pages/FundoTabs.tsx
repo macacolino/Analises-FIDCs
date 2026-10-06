@@ -172,6 +172,62 @@ export function QualidadeFundo({ cnpj }: { cnpj: string }) {
   )
 }
 
+/* ---------- regulamento vigente lido do FNET ---------- */
+const STATUS_REG: Record<string, string> = {
+  ok: 'lido', ilegivel: 'PDF sem texto legível (escaneado ou fonte sem tabela de caracteres) - preencha manualmente',
+  sem_regulamento: 'nenhum regulamento encontrado no FNET para este CNPJ', nao_pdf: 'documento do FNET não é PDF',
+  erro: 'falha ao baixar do FNET', nao_processado: 'ainda não processado (rode python -m fidc.regulamentos)',
+}
+
+function RegulamentoExtraido({ cnpj, onConfirm }: { cnpj: string; onConfirm: () => void }) {
+  const d = useApi<Row>(`/api/fundos/${cnpj}/regulamento/extraido`, { staleTime: 0 })
+  const r = d.data
+  if (!r) return <Loading q={d} />
+  const confirmar = async (c: Row) => {
+    await send('PUT', `/api/fundos/${cnpj}/params`, { chave: c.campo, competencia: '', valor_num: c.valor_num,
+      valor_txt: c.valor_txt, fonte: `Regulamento${c.pagina ? ` p. ${c.pagina}` : ''} (extração confirmada)`, data_base: r.data_entrega?.slice(0, 10) ?? null })
+    onConfirm(); d.refetch()
+  }
+  const params = (r.campos ?? []).filter((c: Row) => c.parametro)
+  const textos = (r.campos ?? []).filter((c: Row) => !c.parametro && c.campo.startsWith('eventos'))
+  return (
+    <div className="card stack" style={{ gap: 8 }}>
+      <div className="row" style={{ gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>Regulamento vigente (FNET)</h2>
+        <span className="muted">{STATUS_REG[r.status] ?? r.status}</span>
+        {r.data_entrega && <span className="muted">entregue em {r.data_entrega} · {r.n_paginas} páginas · {r.tipo}</span>}
+        {r.url_ver && <a href={r.url_ver} target="_blank" rel="noreferrer">abrir no FNET</a>}
+        {r.url_pdf && <a href={r.url_pdf} target="_blank" rel="noreferrer">baixar PDF</a>}
+      </div>
+      <p className="muted" style={{ margin: 0 }}>Leitura automática por regras (sem IA). Os valores abaixo entram nas métricas derivadas
+        enquanto não houver dado manual; confira o trecho e clique em Confirmar para gravar como dado manual.</p>
+      {r.teses?.length > 0 && (
+        <div className="muted">Tese pelo texto (menções): {r.teses.slice(0, 5).map((t: Row) => `${t.tese} ${t.mencoes}`).join(' · ')}</div>
+      )}
+      {params.length > 0 && (
+        <table className="simple">
+          <thead><tr><th>Dado</th><th className="r">Valor extraído</th><th>Página</th><th>Confiança</th><th>Trecho</th><th /></tr></thead>
+          <tbody>{params.map((c: Row) => (
+            <tr key={c.campo}>
+              <td>{c.label}</td>
+              <td className="r">{c.valor_num != null ? fmtValue(c.valor_num, c.fmt) : c.valor_txt}</td>
+              <td>{c.pagina ?? ''}</td><td className="muted">{c.confianca}</td>
+              <td style={{ maxWidth: 640 }}><details><summary className="muted" style={{ cursor: 'pointer' }}>{String(c.trecho).slice(0, 90)}…</summary>
+                <div style={{ whiteSpace: 'pre-wrap' }}>{c.trecho}</div></details></td>
+              <td>{c.tem_manual ? <span className="muted">manual prevalece</span>
+                : <button style={{ padding: '0 8px' }} onClick={() => confirmar(c)}>Confirmar</button>}</td>
+            </tr>))}</tbody>
+        </table>
+      )}
+      {textos.map((c: Row) => (
+        <details key={c.campo}><summary style={{ cursor: 'pointer' }}><b>{c.campo === 'eventos_avaliacao' ? 'Eventos de avaliação' : 'Eventos de liquidação'}</b>
+          <span className="muted"> (p. {c.pagina}, início da seção)</span></summary>
+          <div style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{c.valor_txt}…</div></details>
+      ))}
+    </div>
+  )
+}
+
 /* ---------- regulamento e dados do gestor (manuais) ---------- */
 export function Regulamento({ cnpj }: { cnpj: string }) {
   const qc = useQueryClient()
@@ -190,6 +246,7 @@ export function Regulamento({ cnpj }: { cnpj: string }) {
   }
   return (
     <div className="stack">
+      <RegulamentoExtraido cnpj={cnpj} onConfirm={refresh} />
       <p className="sub" style={{ margin: 0 }}>Dados que o informe não traz (regulamento, suplemento, rating, relatório do gestor). Sempre com fonte e data-base.
         Alimentam M03/M04, folga de subordinação (RF08), RF21 e o roteiro de DD.</p>
       {der.data && der.data.length > 0 && (

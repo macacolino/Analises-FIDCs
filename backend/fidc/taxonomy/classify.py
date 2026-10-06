@@ -42,6 +42,10 @@ class Regra:
     pmr_max: float | None = None
     taxa_min: float | None = None
     taxa_max: float | None = None
+    reg_min: dict[str, int] = field(default_factory=dict)
+    reg_max: dict[str, int] = field(default_factory=dict)
+    reg_maior: list[tuple[str, list[str]]] = field(default_factory=list)
+    com_regulamento: bool = False
     revisar: bool = False
 
     @classmethod
@@ -60,6 +64,9 @@ class Regra:
             sem_cedente=bool(d.get("sem_cedente", False)),
             pmr_min=d.get("pmr_min"), pmr_max=d.get("pmr_max"),
             taxa_min=d.get("taxa_min"), taxa_max=d.get("taxa_max"),
+            reg_min=dict(d.get("reg_min") or {}), reg_max=dict(d.get("reg_max") or {}),
+            reg_maior=[(a, [b] if isinstance(b, str) else list(b)) for a, b in (d.get("reg_maior") or {}).items()],
+            com_regulamento=bool(d.get("com_regulamento", False)),
             revisar=bool(d.get("revisar", False)),
         )
 
@@ -92,6 +99,19 @@ class Regra:
                 continue
             v = f.get(campo)
             if v is None or pd.isna(v) or (v < lim if maior else v > lim):
+                return False
+        if self.reg_min or self.reg_max or self.reg_maior or self.com_regulamento:
+            tem = bool(f.get("tem_reg"))
+            if (self.reg_min or self.reg_maior or self.com_regulamento) and not tem:
+                return False
+
+            def sig(k):  # "a+b" soma sinais
+                return sum(f.get(f"reg_{x.strip()}") or 0 for x in k.split("+"))
+            if any(sig(k) < n for k, n in self.reg_min.items()):
+                return False
+            if tem and any(sig(k) > n for k, n in self.reg_max.items()):   # sem regulamento lido: não restringe
+                return False
+            if any(sig(a) <= sum(sig(b) for b in bs) for a, bs in self.reg_maior):
                 return False
         return True
 
@@ -148,8 +168,26 @@ FROM ult u LEFT JOIN ced c USING (cnpj, dt) LEFT JOIN aq USING (cnpj) LEFT JOIN 
 """
 
 
+def _sinais_regulamento(con) -> pd.DataFrame | None:
+    try:
+        s = con.execute("""SELECT r.cnpj, s.sinal, s.n FROM regulamento r LEFT JOIN regulamento_sinal s USING (cnpj)
+                           WHERE r.status = 'ok'""").df()
+    except Exception:  # noqa: BLE001 - base sem regulamentos
+        return None
+    if s.empty:
+        return None
+    p = s.dropna(subset=["sinal"]).pivot_table(index="cnpj", columns="sinal", values="n", aggfunc="sum")
+    p = p.reindex(s.cnpj.unique()).fillna(0).add_prefix("reg_").reset_index()
+    p["tem_reg"] = True
+    return p
+
+
 def features(con) -> pd.DataFrame:
     df = con.execute(FEATURES_SQL).df()
+    sig = _sinais_regulamento(con)
+    if sig is not None:
+        df = df.merge(sig, on="cnpj", how="left")
+    df["tem_reg"] = df["tem_reg"].fillna(False).astype(bool) if "tem_reg" in df else False
     seg = df[[f"seg_{s}" for s in SEGMENTOS]].clip(lower=0)
     total = seg.sum(axis=1)
     for s in SEGMENTOS:

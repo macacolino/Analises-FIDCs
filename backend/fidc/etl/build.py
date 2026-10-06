@@ -21,6 +21,7 @@ from pathlib import Path
 import duckdb
 
 from .. import config
+from .. import regulamentos
 from ..taxonomy import classify
 from . import bcb, casa, cvm_cadastro, qualidade
 
@@ -560,6 +561,7 @@ def build(db_path: Path | None = None) -> Path:
     log.info("bcb"); bcb.build_table(con)
     log.info("casa_mes / safras"); casa.build(con)
     log.info("qualidade"); qualidade.build(con)
+    log.info("regulamentos"); regulamentos.build_table(con)
     log.info("classificacao"); classify.build_table(con)
     log.info("comp_mes")
     con.execute(COMP_SQL)
