@@ -42,7 +42,7 @@ GLIFOS_SEED = Path(__file__).parent / "taxonomy" / "glifos_calibri.json"
 GLIFOS = DIR / "glifos_aprendidos.json"
 SEED = Path(__file__).parent / "seed" / "regulamentos.json.gz"   # resultado versionado no repositório (sem os textos)
 DOWNLOAD = f"{config.FNET_BASE}/downloadDocumento?id={{}}"
-VERSAO_REGRAS = 5   # mude quando as regras de leitura mudarem: força reprocessar o texto já baixado
+VERSAO_REGRAS = 6   # mude quando as regras de leitura mudarem: força reprocessar o texto já baixado
 LIMITE_DIARIO = 150   # regulamentos novos lidos por execução do ETL diário
 
 SCHEMA = """
@@ -270,7 +270,14 @@ def campos(paginas: list[str]) -> list[dict]:
         n = _norm(s)
         if "subordina" not in n or not re.search(r"minim|no minimo|nao inferior|igual ou superior", n):
             continue
-        m = re.search(_PCT, s)
+        if re.search(r"quorum|em circulacao (de cada|objeto)|spread|liquidez|ao ano|a\.a\.|amortizac|taxa de|glossario", n):
+            continue
+        # o percentual tem de vir logo depois da menção à subordinação (não um % qualquer da sentença)
+        m = None
+        for k in re.finditer(r"subordina", n):
+            m = re.compile(_PCT).search(n, k.start(), k.start() + 250)
+            if m:
+                break
         if not m:
             continue
         v = _num(m.group(1)) / 100
@@ -316,21 +323,30 @@ def campos(paginas: list[str]) -> list[dict]:
         v, s, pg = min(lst, key=lambda x: x[0])
         conf = "alta" if len({round(x[0], 4) for x in lst}) == 1 else "media"
         put(campo, v, None, s, pg, conf)
-    # --- responsabilidade
+    # --- responsabilidade: conta as duas formas (o termo de ciência de responsabilidade ilimitada é citado mesmo
+    # em classe limitada quando o regulamento prevê as duas)
     tudo = _norm(" ".join(paginas))
-    if re.search(r"responsabilidade ilimitada", tudo):
-        put("responsabilidade_limitada", None, "N", "menciona 'responsabilidade ilimitada'", None, "baixa")
-    elif re.search(r"responsabilidade (dos cotistas )?(e |sera )?limitada|responsabilidade limitada", tudo):
-        put("responsabilidade_limitada", None, "S", "menciona 'responsabilidade limitada'", None, "media")
-    # --- eventos de avaliação e liquidação: guarda o começo da seção para leitura
-    for campo, pat in (("eventos_avaliacao", r"eventos? de avaliac"), ("eventos_liquidacao", r"eventos? de liquidac")):
+    lim = len(re.findall(r"responsabilidade (dos cotistas )?(e |sera )?limitada|responsabilidade limitada", tudo))
+    ilim = len(re.findall(r"responsabilidade ilimitada|ausencia de limitacao de responsabilidade", tudo))
+    if lim or ilim:
+        put("responsabilidade_limitada", None, "S" if lim >= ilim else "N",
+            f"menções: 'responsabilidade limitada' {lim}×, 'ilimitada' {ilim}×", None,
+            "alta" if not (lim and ilim) else "baixa")
+    # --- eventos de avaliação e liquidação: a frase que abre a lista ("a ocorrência de qualquer das seguintes
+    # hipóteses constituirá Evento de Avaliação: (i) ...")
+    for campo, nucleo in (("eventos_avaliacao", r"eventos? de avalia[çc][ãa]o"),
+                          ("eventos_liquidacao", r"eventos? de liquida[çc][ãa]o( antecipada)?")):
+        pat = re.compile(r"(?i)[^.;:]{0,200}?" + nucleo + r"[^.;:]{0,100}:")
+        achou = False
         for pg, p in enumerate(paginas, 1):
             t = re.sub(r"\s+", " ", p)
-            m = re.search(r"(?i)(s[ãa]o considerados eventos de " + ("avalia" if "aval" in campo else "liquida") + r"|"
-                          + ("eventos? de avalia[çc][ãa]o" if "aval" in campo else "eventos? de liquida[çc][ãa]o")
-                          + r")[^.]{0,80}?:", t)
-            if m:
-                put(campo, None, t[m.start():m.start() + 1500], t[m.start():m.start() + 600], pg, "media")
+            for m in pat.finditer(t):
+                if re.search(r"(?i)seguint|considerad|constitu|configur|caracteriz", m.group(0)):
+                    i = m.start() + len(m.group(0)) - len(m.group(0).lstrip())
+                    put(campo, None, t[i:i + 2500], t[i:i + 600], pg, "media")
+                    achou = True
+                    break
+            if achou:
                 break
     # derivado: Jr mínima em % do PL quando definida sobre as subordinadas
     if "jr_min_sobre_subordinadas" in out and "sub_min_senior" in out and "jr_min_pl" not in out:

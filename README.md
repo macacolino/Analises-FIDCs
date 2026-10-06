@@ -71,6 +71,25 @@ hospedagem deve ser revisada com Segurança da Informação.
 - **Roteiro de DD** por categoria (consignado privado, MCMS, geral) e **dados manuais** de regulamento e gestor com fonte e data-base.
 - Mapeamento completo do que sai do informe e do que é manual: [docs/MAPEAMENTO_ANALISES.md](docs/MAPEAMENTO_ANALISES.md).
 
+## Regulamentos (FNET)
+O regulamento vigente de cada fundo é baixado do FNET (B3) — **gratuito, sem chave e sem IA** — e lido por regras de texto:
+- **Campos**: subordinação mínima, Jr mínima (convertida para % do PL quando definida sobre as subordinadas), limites do
+  maior cedente/devedor e dos 5/10 maiores, responsabilidade limitada e o início das seções de eventos de avaliação e
+  liquidação. Cada valor vem com **página e trecho**. Na falta de dado manual, entra nas métricas derivadas (folga de
+  subordinação, M03/M04, RF21) como "regulamento (extração automática)". O dado manual sempre prevalece, e o botão
+  **Confirmar** na aba *Regulamento e gestor* grava o valor extraído como manual.
+- **Sinais da tese** (contagem de termos e leis): consignado; INSS/RGPS; servidor/entes consignantes; consignado privado
+  (empregador, eSocial, CLT, Crédito do Trabalhador, Lei 15.179); FGTS; precatório; duplicata; CCB etc. A taxonomia usa
+  esses sinais (`reg_min`, `reg_max`, `reg_maior`, `com_regulamento`) para separar consignado público × privado, tirar
+  da categoria quem declara segmento consignado sem regulamento de consignado e achar consignado fora do segmento F2.
+  Ordem: nome do fundo > regulamento > heurística de prazo/taxa.
+- Comandos: `python -m fidc.regulamentos --limite 500` (lote; ~18 fundos/min com 4 processos),
+  `--cnpj X Y` (fundos específicos), `--reler` (reaplica as regras sem baixar), `--seed` (exporta o resultado para
+  `backend/fidc/seed/`, que vai no repositório para o Codespace não precisar baixar tudo). O ETL diário lê até 150
+  regulamentos novos por execução.
+- PDFs sem texto (escaneados) ficam como "ilegível". PDFs com fonte Calibri sem tabela de caracteres são decodificados
+  por um mapa de glifos aprendido dos próprios regulamentos.
+
 ## Páginas
 | Página | O que tem |
 |---|---|
@@ -142,7 +161,8 @@ informe atrasado; maior cedente >50% (informativo).
 - Taxa de desconto das aquisições (Tab. IX) não tem unidade padronizada entre administradores.
 - Nomes de séries mudaram com a Res. CVM 175; rentabilidade 12m de séries antigas não é encadeada.
 - A API do FNET não é documentada oficialmente; o app degrada para cache/aviso se ela falhar.
-- "Financeiro – outros" (~R$ 158 bi) ainda concentra fundos sem detalhe; melhora com regras novas ou leitura dos regulamentos.
+- "Financeiro – outros" ainda concentra fundos sem detalhe; a leitura dos regulamentos tira daí os consignados, mas outras teses ainda não têm regra.
+- Leitura de regulamento por regras erra em redações atípicas (ex.: limite definido em tabela). Por isso todo valor vem com trecho e página para conferência.
 
 ## Estrutura
 ```
