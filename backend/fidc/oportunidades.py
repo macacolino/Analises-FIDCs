@@ -61,6 +61,46 @@ def mercado(meses: int = 24) -> dict:
             "excluidos": erros[["cnpj", "dt", "cap", "pl", "pl_ant"]].sort_values("cap", ascending=False)}
 
 
+OFERTA_SQL = """
+SELECT cnpj, arg_max(data_registro, coalesce(data_registro, data_requerimento)) AS ultima_oferta_registro,
+       arg_max(data_requerimento, coalesce(data_registro, data_requerimento)) AS ultima_oferta_requerimento,
+       arg_max(valor_registrado, coalesce(data_registro, data_requerimento)) AS ultima_oferta_valor,
+       arg_max(status, coalesce(data_registro, data_requerimento)) AS ultima_oferta_status,
+       arg_max(publico_alvo, coalesce(data_registro, data_requerimento)) AS ultima_oferta_publico,
+       count(*) FILTER (WHERE data_registro > current_date - INTERVAL 12 MONTH) AS ofertas_12m,
+       sum(valor_registrado) FILTER (WHERE data_registro > current_date - INTERVAL 12 MONTH) AS valor_ofertas_12m
+FROM oferta WHERE cnpj IS NOT NULL GROUP BY cnpj
+"""
+
+
+def _com_ofertas(d: pd.DataFrame) -> pd.DataFrame:
+    try:
+        return d.merge(df(OFERTA_SQL), on="cnpj", how="left")
+    except Exception:  # noqa: BLE001 - base sem a tabela de ofertas
+        return d
+
+
+def ofertas(dias: int = 90, categoria: str | None = None) -> pd.DataFrame:
+    """Ofertas de cotas de FIDC registradas/requeridas nos últimos `dias`, com o perfil do fundo quando conhecido."""
+    from . import comparacao as cp
+    o = df("""SELECT cnpj, cnpj_emissor, nome_emissor, data_requerimento, data_registro, data_encerramento, status,
+                     valor_registrado, publico_alvo, tipo_oferta, emissao, lider, gestor_oferta, rito
+              FROM oferta WHERE coalesce(data_registro, data_requerimento) > current_date - INTERVAL (?) DAY""", [dias])
+    u = cp.universo()
+    cols = [c for c in ["cnpj", "nome", "gestor", "categoria", "categoria_nome", "pl", "subordinacao", "q_status"]
+            if c in u.columns]
+    o = o.merge(u[cols], on="cnpj", how="left")
+    o["nome"] = o.nome.fillna(o.nome_emissor)
+    o["fundo_novo_sem_informe"] = o.pl.isna()
+    if categoria:
+        o = o[o.categoria == categoria]
+    try:
+        o = o.merge(df("SELECT cnpj, lastro FROM regulamento_ia"), on="cnpj", how="left")
+    except Exception:  # noqa: BLE001
+        o["lastro"] = None
+    return o.sort_values(["data_registro", "valor_registrado"], ascending=[False, False])
+
+
 def fundos(meses: int = 3, categoria: str | None = None) -> pd.DataFrame:
     """Fundos que mais captaram nos últimos `meses`, com o perfil para triagem."""
     from . import comparacao as cp
@@ -87,7 +127,7 @@ def fundos(meses: int = 3, categoria: str | None = None) -> pd.DataFrame:
         g = g.merge(ia, on="cnpj", how="left")
     except Exception:  # noqa: BLE001
         g["lastro"] = None
-    return g.sort_values("captacao", ascending=False)
+    return _com_ofertas(g).sort_values("captacao", ascending=False)
 
 
 def novos(meses: int = 6) -> pd.DataFrame:
@@ -103,4 +143,4 @@ def novos(meses: int = 6) -> pd.DataFrame:
         d = d.merge(df("SELECT cnpj, lastro FROM regulamento_ia"), on="cnpj", how="left")
     except Exception:  # noqa: BLE001
         d["lastro"] = None
-    return d.sort_values(["primeiro_informe", "pl"], ascending=[False, False])
+    return _com_ofertas(d).sort_values(["primeiro_informe", "pl"], ascending=[False, False])

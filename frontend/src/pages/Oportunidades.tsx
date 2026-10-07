@@ -10,12 +10,15 @@ export default function Oportunidades() {
   const tax = useTaxonomia()
   const m = useApi<{ serie: Row[]; resumo: Row[]; total: Row[]; n_excluidos: number }>('/api/oportunidades/mercado')
   const [sel, setSel] = useState<string[] | null>(null)
-  const [tab, setTab] = useState<'fundos' | 'novos' | 'cat'>('fundos')
+  const [tab, setTab] = useState<'ofertas' | 'fundos' | 'novos' | 'cat'>('ofertas')
+  const [dias, setDias] = useState(90)
   const [meses, setMeses] = useState(3)
   const [cat, setCat] = useState('')
   const fundosUrl = `/api/oportunidades/fundos?meses=${meses}${cat ? `&categoria=${cat}` : ''}`
   const fundos = useApi<Row[]>(tab === 'fundos' ? fundosUrl : null)
   const novos = useApi<Row[]>(tab === 'novos' ? '/api/oportunidades/novos?meses=6' : null)
+  const ofertasUrl = `/api/oportunidades/ofertas?dias=${dias}${cat ? `&categoria=${cat}` : ''}`
+  const ofertas = useApi<Row[]>(tab === 'ofertas' ? ofertasUrl : null)
 
   const top = useMemo(() => (m.data?.resumo ?? []).slice(0, 5).map((r) => r.categoria), [m.data])
   const escolhidas = sel ?? top
@@ -41,7 +44,8 @@ export default function Oportunidades() {
       <div>
         <h1>Novas oportunidades</h1>
         <div className="sub">Como o mercado está captando e quais fundos estão captando ou acabaram de nascer. Captação, resgates e
-          amortizações da Tab. X.4 do informe CVM (todas as classes de cota).</div>
+          amortizações da Tab. X.4 do informe CVM (todas as classes de cota); ofertas registradas na CVM (dados abertos, diário) –
+          a oferta aparece antes da captação chegar ao informe.</div>
       </div>
       <Loading q={m} />
       {m.data && (
@@ -74,7 +78,25 @@ export default function Oportunidades() {
         </>
       )}
       <div className="card">
-        <Tabs value={tab} onChange={setTab} options={[['fundos', 'Fundos captando'], ['novos', 'Fundos novos (6 meses)'], ['cat', 'Por categoria']]} />
+        <Tabs value={tab} onChange={setTab} options={[['ofertas', 'Ofertas registradas (CVM)'], ['fundos', 'Fundos captando'], ['novos', 'Fundos novos (6 meses)'], ['cat', 'Por categoria']]} />
+        {tab === 'ofertas' && (
+          <DataGrid rows={ofertas.data} exportUrl={ofertasUrl} height={600}
+            extra={(
+              <>
+                <select value={dias} onChange={(e) => setDias(Number(e.target.value))}>
+                  {[30, 90, 180, 365].map((n) => <option key={n} value={n}>últimos {n} dias</option>)}
+                </select>
+                <select value={cat} onChange={(e) => setCat(e.target.value)}>
+                  <option value="">Todas as categorias</option>
+                  {tax.data?.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </>
+            )}
+            cols={['nome', 'categoria_nome', { field: 'data_registro', sort: 'desc' }, 'data_requerimento', 'valor_registrado', 'status',
+                   'publico_alvo', 'tipo_oferta', 'emissao', 'rito', 'lider', 'gestor', 'pl', 'subordinacao',
+                   { field: 'fundo_novo_sem_informe', valueFormatter: (p: any) => (p.value ? 'sim' : '') },
+                   { field: 'lastro', width: 420 }, 'data_encerramento', 'cnpj_emissor']} />
+        )}
         {tab === 'fundos' && (
           <DataGrid rows={fundos.data} exportUrl={fundosUrl} height={600}
             extra={(
@@ -90,11 +112,13 @@ export default function Oportunidades() {
             )}
             cols={['nome', 'categoria_nome', 'gestor', { field: 'captacao', sort: 'desc' }, 'liquida', 'cap_senior', 'cap_mezanino',
                    'cap_sub', 'captacao_pct_pl', 'meses_captando', 'pl', { field: 'novo', valueFormatter: (p: any) => (p.value ? 'novo' : '') },
-                   'primeiro_informe', 'subordinacao', 'jr_pl', 'over90_carteira', { field: 'lastro', width: 420 }, 'q_status', 'admin']} />
+                   'primeiro_informe', 'ultima_oferta_registro', 'ultima_oferta_valor', 'ultima_oferta_status', 'ofertas_12m',
+                   'valor_ofertas_12m', 'subordinacao', 'jr_pl', 'over90_carteira', { field: 'lastro', width: 420 }, 'q_status', 'admin']} />
         )}
         {tab === 'novos' && (
           <DataGrid rows={novos.data} exportUrl="/api/oportunidades/novos?meses=6" height={600}
-            cols={['nome', 'categoria_nome', 'gestor', { field: 'primeiro_informe', sort: 'desc' }, 'pl', 'subordinacao', 'jr_pl',
+            cols={['nome', 'categoria_nome', 'gestor', { field: 'primeiro_informe', sort: 'desc' }, 'ultima_oferta_registro',
+                   'ultima_oferta_valor', 'ultima_oferta_publico', 'pl', 'subordinacao', 'jr_pl',
                    { field: 'lastro', width: 460 }, 'q_status', 'admin']} />
         )}
         {tab === 'cat' && m.data && (

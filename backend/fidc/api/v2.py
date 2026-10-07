@@ -702,36 +702,49 @@ def comparativo(categorias: list[str]) -> pd.DataFrame:
     ph = ",".join("?" * len(categorias))
     base = df(f"""
         WITH ult AS (SELECT ultimo_mes_completo AS dt FROM _meta),
-        s12 AS (
-          SELECT s.cnpj, s.serie, s.tipo, count(*) AS n,
-                 -- 12 meses; com 6 a 11 meses (série renomeada/nova), anualizado
-                 exp(sum(ln(1 + s.rentab_mes / 100)) * 12.0 / count(*)) - 1 AS r12,
-                 max(s.pl_serie) FILTER (WHERE s.dt = (SELECT dt FROM ult)) AS pl_serie
-          FROM serie_mes s JOIN fundo f USING (cnpj)
-          WHERE f.categoria IN ({ph}) AND s.dt > (SELECT dt FROM ult) - INTERVAL 12 MONTH
-            AND s.dt <= (SELECT dt FROM ult) AND s.rentab_mes BETWEEN -60 AND 60   -- fora disso é erro de preenchimento
+        -- último informe de cada fundo com séries (até 3 meses de atraso), não só o mês de referência
+        uf AS (
+          SELECT s.cnpj, max(s.dt) AS dt FROM serie_mes s JOIN fundo f USING (cnpj)
+          WHERE f.categoria IN ({ph}) AND s.pl_serie > 1000
+            AND s.dt BETWEEN (SELECT dt FROM ult) - INTERVAL 3 MONTH AND (SELECT dt FROM ult)
+          GROUP BY s.cnpj),
+        -- rentabilidade mês a mês, sem depender do nome da série (administradores renomeiam séries)
+        mes AS (
+          SELECT s.cnpj, s.dt,
+                 arg_max(s.rentab_mes, s.pl_serie) AS r_maior,
+                 sum(s.rentab_mes * s.pl_serie) FILTER (WHERE s.tipo = 'senior')
+                   / nullif(sum(s.pl_serie) FILTER (WHERE s.tipo = 'senior'), 0) AS r_sen,
+                 sum(s.rentab_mes * s.pl_serie) FILTER (WHERE s.tipo = 'mezanino')
+                   / nullif(sum(s.pl_serie) FILTER (WHERE s.tipo = 'mezanino'), 0) AS r_mez,
+                 sum(s.rentab_mes * s.pl_serie) FILTER (WHERE s.tipo = 'subordinada')
+                   / nullif(sum(s.pl_serie) FILTER (WHERE s.tipo = 'subordinada'), 0) AS r_sub
+          FROM serie_mes s JOIN uf USING (cnpj)
+          WHERE s.dt > uf.dt - INTERVAL 12 MONTH AND s.dt <= uf.dt AND s.pl_serie > 1000
+            AND s.rentab_mes BETWEEN -60 AND 60   -- fora disso é erro de preenchimento
           GROUP BY ALL),
         agg AS (
-          SELECT cnpj, count(*) FILTER (WHERE pl_serie > 1000) AS n_series_pl,
-                 sum(r12 * pl_serie) FILTER (WHERE tipo = 'senior' AND n >= 6 AND pl_serie > 1000)
-                   / nullif(sum(pl_serie) FILTER (WHERE tipo = 'senior' AND n >= 6 AND pl_serie > 1000), 0) AS r12_senior,
-                 sum(r12 * pl_serie) FILTER (WHERE tipo = 'mezanino' AND n >= 6 AND pl_serie > 1000)
-                   / nullif(sum(pl_serie) FILTER (WHERE tipo = 'mezanino' AND n >= 6 AND pl_serie > 1000), 0) AS r12_mezanino,
-                 sum(r12 * pl_serie) FILTER (WHERE tipo = 'subordinada' AND n >= 6 AND pl_serie > 1000)
-                   / nullif(sum(pl_serie) FILTER (WHERE tipo = 'subordinada' AND n >= 6 AND pl_serie > 1000), 0) AS r12_sub,
-                 max(r12) FILTER (WHERE pl_serie > 1000 AND n >= 6) AS r12_unica,
-                 min(n) FILTER (WHERE pl_serie > 1000) AS meses_rentab
-          FROM s12 GROUP BY cnpj),
+          -- 12 meses; com 6 a 11 meses de histórico, anualizado
+          SELECT m.cnpj,
+                 (SELECT count(*) FROM serie_mes z WHERE z.cnpj = m.cnpj AND z.dt = any_value(uf.dt)
+                    AND z.pl_serie > 1000) AS n_series_pl,
+                 CASE WHEN count(r_maior) >= 6 THEN exp(sum(ln(1 + r_maior / 100)) * 12.0 / count(r_maior)) - 1 END AS r12_unica,
+                 CASE WHEN count(r_sen) >= 6 THEN exp(sum(ln(1 + r_sen / 100)) * 12.0 / count(r_sen)) - 1 END AS r12_senior,
+                 CASE WHEN count(r_mez) >= 6 THEN exp(sum(ln(1 + r_mez / 100)) * 12.0 / count(r_mez)) - 1 END AS r12_mezanino,
+                 CASE WHEN count(r_sub) >= 6 THEN exp(sum(ln(1 + r_sub / 100)) * 12.0 / count(r_sub)) - 1 END AS r12_sub,
+                 count(r_maior) AS meses_rentab
+          FROM mes m JOIN uf USING (cnpj) GROUP BY m.cnpj),
         seg AS (
           SELECT cnpj, coalesce(seg_I1, 0) / nullif(""" + " + ".join(f"coalesce(seg_{x}, 0)" for x in
                  ["A", "B", "C1", "C2", "C3", "D1", "D2", "D3", "D4", "E", "F1", "F2", "F3", "F4", "F5", "F6", "F7",
                   "F8", "G", "H1", "H2", "I1", "I2", "I3", "I4", "J", "K"]) + f""", 0) AS pct_precatorios
-          FROM fundo_mes WHERE dt = (SELECT dt FROM ult))
+          FROM fundo_mes JOIN uf USING (cnpj, dt))
         SELECT f.cnpj, f.nome, f.gestor, f.admin, f.categoria, f.categoria_nome, f.pl, a.n_series_pl,
-               a.r12_unica, a.r12_senior, a.r12_mezanino, a.r12_sub, a.meses_rentab, k.cdi_12m, g.pct_precatorios
-        FROM fundo f JOIN agg a USING (cnpj) LEFT JOIN seg g USING (cnpj)
-        LEFT JOIN cdi_mes k ON k.dt = (SELECT dt FROM ult)
-        WHERE f.categoria IN ({ph}) AND f.pl > 0""", categorias + categorias)
+               a.r12_unica, a.r12_senior, a.r12_mezanino, a.r12_sub, a.meses_rentab, k.cdi_12m, g.pct_precatorios,
+               uf.dt AS dt_informe
+        FROM fundo f LEFT JOIN agg a USING (cnpj) LEFT JOIN uf USING (cnpj) LEFT JOIN seg g USING (cnpj)
+        LEFT JOIN cdi_mes k ON k.dt = coalesce(uf.dt, (SELECT dt FROM ult))
+        WHERE f.categoria IN ({ph}) AND f.pl > 0
+          AND f.ultimo_informe >= (SELECT dt FROM ult) - INTERVAL 3 MONTH""", categorias + categorias)
     if base.empty:
         return base
     for c in ("r12_unica", "r12_senior", "r12_mezanino", "r12_sub"):
@@ -795,7 +808,7 @@ def comparativo(categorias: list[str]) -> pd.DataFrame:
         a = r.a if r.a is not None and not pd.isna(r.a) else 0
         return "provável (regras)" if a >= 2 else None
     base["alimentar"] = base.apply(alim, axis=1)
-    cols = ["cnpj", "nome", "gestor", "categoria_nome", "pl", "foco", "alimentar", "pct_precatorios", "estrutura",
+    cols = ["cnpj", "nome", "gestor", "categoria_nome", "pl", "dt_informe", "foco", "alimentar", "pct_precatorios", "estrutura",
             "rentab_12m_cota_unica", "rentab_12m_senior", "spread_cdi_12m", "pct_cdi_12m", "rentab_12m_mezanino",
             "rentab_12m_subordinada", "meses_rentab", "cdi_12m", "subordinacao", "jr_pl", "benchmark_senior", "taxa_gestao",
             "taxa_administracao", "taxa_performance", "taxa_minima_cessao", "over90_carteira", "q_status", "admin",
@@ -831,6 +844,14 @@ def oportunidades_fundos(meses: int = 3, categoria: str | None = None, formato: 
     return _out(op.fundos(meses, categoria or None), formato, "Fundos captando",
                 "Captação da Tab. X.4 (todas as classes); registros com captação > 1,5x o PL + resgates + amortizações "
                 "excluídos como erro de preenchimento.")
+
+
+@router.get("/oportunidades/ofertas")
+def oportunidades_ofertas(dias: int = 90, categoria: str | None = None, formato: str | None = None):
+    from .. import oportunidades as op
+    return _out(op.ofertas(dias, categoria or None), formato, "Ofertas registradas",
+                "Ofertas de cotas de FIDC na CVM (dados abertos, atualização diária). Valor registrado = teto da oferta, "
+                "não o captado; o captado aparece depois na Tab. X.4 do informe.")
 
 
 @router.get("/oportunidades/novos")

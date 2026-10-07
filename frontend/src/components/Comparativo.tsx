@@ -9,6 +9,12 @@ const mediana = (v: number[]) => {
   return s.length ? s[Math.floor((s.length - 1) / 2)] : null
 }
 
+/** subordinação não se aplica a fundo de cota única (não há sênior a proteger) */
+const naCotaUnica = (field: string) => ({
+  field,
+  valueFormatter: (p: any) => (p.data?.estrutura === 'cota única' && p.value == null ? 'n/a (cota única)' : fmtValue(p.value, 'pct')),
+})
+
 /** Comparativo por estratégia: rentabilidade 12m por tipo de cota, remuneração vs CDI, estrutura, taxas */
 export function Comparativo({ categoria: fixa }: { categoria?: string }) {
   const tax = useTaxonomia()
@@ -53,9 +59,9 @@ export function Comparativo({ categoria: fixa }: { categoria?: string }) {
       </div>
       <Loading q={d} />
       <DataGrid rows={rows} exportUrl={url} height={560}
-        cols={['nome', 'gestor', { field: 'pl', sort: 'desc' }, 'foco', 'alimentar', 'estrutura', 'rentab_12m_cota_unica',
+        cols={['nome', 'gestor', { field: 'pl', sort: 'desc' }, 'dt_informe', 'foco', 'alimentar', 'estrutura', 'rentab_12m_cota_unica',
                'rentab_12m_senior', 'spread_cdi_12m', 'pct_cdi_12m', 'rentab_12m_mezanino', 'rentab_12m_subordinada',
-               'meses_rentab', 'subordinacao', 'jr_pl', 'benchmark_senior', 'taxa_gestao', 'taxa_administracao',
+               'meses_rentab', naCotaUnica('subordinacao'), naCotaUnica('jr_pl'), 'benchmark_senior', 'taxa_gestao', 'taxa_administracao',
                'taxa_performance', 'taxa_minima_cessao', 'pct_precatorios', 'over90_carteira', 'q_status', 'admin']} />
       <p className="muted">Rentabilidade 12m pelo informe CVM (séries com PL; com 6–11 meses de histórico, anualizada – ver
         "Meses na conta"). Remuneração vs CDI = (1 + rentab. 12m da cota única ou sênior) / (1 + CDI 12m) − 1. Taxas, benchmark e

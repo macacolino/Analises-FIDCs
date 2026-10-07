@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import threading
 
-from . import bcb, build, cvm_cadastro, cvm_download, cvm_load
+from . import bcb, build, cvm_cadastro, cvm_download, cvm_load, cvm_ofertas
 
 log = logging.getLogger(__name__)
 _lock = threading.Lock()
@@ -26,6 +26,10 @@ def run(download: bool = True) -> dict:
                 cvm_cadastro.download()
             except Exception as e:  # noqa: BLE001 - cadastro é complementar
                 log.warning("falha ao baixar cadastro CVM: %s", e)
+            try:
+                cvm_ofertas.download()
+            except Exception as e:  # noqa: BLE001 - complementar
+                log.warning("falha ao baixar ofertas CVM: %s", e)
             try:  # regulamentos de fundos ainda não lidos (limitado por execução; o lote completo é manual)
                 from .. import config, regulamentos
                 if config.DB_PATH.exists():

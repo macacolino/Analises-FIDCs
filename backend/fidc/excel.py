@@ -35,8 +35,13 @@ def _write_sheet(ws, df: pd.DataFrame, nota: str | None = None) -> None:
         c.alignment = Alignment(wrap_text=True, vertical="center")
     for i, rec in enumerate(df.itertuples(index=False), row0 + 1):
         for j, v in enumerate(rec, 1):
-            if v is None or (isinstance(v, float) and pd.isna(v)) or v is pd.NaT:
+            if v is None or v is pd.NA or v is pd.NaT or (isinstance(v, float) and pd.isna(v)):
                 continue
+            if hasattr(v, "item") and not isinstance(v, (str, bytes)):   # numpy/pandas escalares
+                try:
+                    v = v.item()
+                except (ValueError, AttributeError):
+                    pass
             if isinstance(v, pd.Timestamp):
                 v = v.to_pydatetime().date()
             ws.cell(i, j, v)

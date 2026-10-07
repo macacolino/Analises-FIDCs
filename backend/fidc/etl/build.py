@@ -23,7 +23,7 @@ import duckdb
 from .. import config
 from .. import agente_regulamento, regulamentos
 from ..taxonomy import classify
-from . import bcb, casa, cvm_cadastro, qualidade
+from . import bcb, casa, cvm_cadastro, cvm_ofertas, qualidade
 
 log = logging.getLogger(__name__)
 
@@ -580,6 +580,7 @@ def build(db_path: Path | None = None) -> Path:
     con.execute(COMP_SQL)
     log.info("setor_mes"); con.execute(SETOR_SQL)
     log.info("cadastro"); cvm_cadastro.build_table(con)
+    log.info("ofertas"); cvm_ofertas.build_table(con)
     con.execute("""
         CREATE TABLE fundo AS  -- última foto de cada fundo, para busca
         SELECT m.cnpj, m.nome, m.admin, k.gestor, m.dt AS ultimo_informe, m.pl, c.categoria, c.categoria_nome,
