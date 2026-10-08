@@ -110,8 +110,12 @@ export default function LaminaPdf() {
   const men = useApi<MensalResp>(`/api/fundos/${cnpj}/mensal?meses=24`)
   const comp = useApi<any>(`/api/comparar/${cnpj}?modo=categoria&ignorar_sem_vencido=true`)
   const ext = useApi<Extra>(`/api/fundos/${cnpj}/lamina-extra`)
-  const pronto = !!(lam.data && hist.data && men.data && comp.data && ext.data)
-  const erro = lam.error || hist.error || men.error || comp.error || ext.error
+  // medianas dos pares no tempo: mesma base do quadro de pares (categoria, sem dado com erro e, para atraso,
+  // sem os fundos que declaram zero vencido)
+  const sOver = useApi<Row[]>(`/api/comparar/${cnpj}/serie?metrica=over90_carteira&meses=24`)
+  const sPdd = useApi<Row[]>(`/api/comparar/${cnpj}/serie?metrica=pdd_carteira&meses=24`)
+  const pronto = !!(lam.data && hist.data && men.data && comp.data && ext.data && sOver.data && sPdd.data)
+  const erro = lam.error || hist.error || men.error || comp.error || ext.error || sOver.error || sPdd.error
 
   useEffect(() => {
     if (!lam.data) return
@@ -126,8 +130,8 @@ export default function LaminaPdf() {
     }
   }, [pronto, sp])
 
-  const d = useMemo(() => (pronto ? montar(lam.data, hist.data!, men.data!, comp.data, ext.data!) : null),
-    [pronto, lam.data, hist.data, men.data, comp.data, ext.data])
+  const d = useMemo(() => (pronto ? montar(lam.data, hist.data!, men.data!, comp.data, ext.data!, sOver.data!, sPdd.data!) : null),
+    [pronto, lam.data, hist.data, men.data, comp.data, ext.data, sOver.data, sPdd.data])
 
   if (erro) return <div className="lam-wait">Não foi possível carregar os dados do fundo.</div>
   if (!d) return <div className="lam-wait">Montando a lâmina…</div>
@@ -164,7 +168,7 @@ export default function LaminaPdf() {
           <Kpi v={p1(k.subordinacao_junior)} label="Subordinada júnior / PL"
             hint={d.par.jr_min_pl?.valor_num != null ? <>mínimo do regulamento {p1(d.par.jr_min_pl.valor_num)}</> : 'mínimo não localizado no regulamento'}
             alerta={d.par.jr_min_pl?.valor_num != null && k.subordinacao_junior < d.par.jr_min_pl.valor_num} />
-          <Kpi v={p(k.inad_90)} label="Inadimplência > 90 dias" hint={d.med.inad_90 != null ? <>mediana da categoria {p(d.med.inad_90)}</> : undefined} />
+          <Kpi v={p(k.inad_90)} label="Inadimplência > 90 dias (Over 90)" hint={d.med.inad_90 != null ? <>mediana da categoria {p(d.med.inad_90)}</> : undefined} />
           <Kpi v={p(k.pdd_carteira)} label="PDD / carteira" hint={d.med.pdd_carteira != null ? <>mediana da categoria {p(d.med.pdd_carteira)}</> : undefined} />
           <Kpi v={fmtValue(k.cobertura_pdd_90, 'x')} label="PDD / vencido > 90 dias" hint={d.med.cobertura_pdd_90 != null ? <>mediana da categoria {fmtValue(d.med.cobertura_pdd_90, 'x')}</> : undefined} />
           <Kpi v={d.senior12 ? p1(d.senior12.cota_12m) : '–'} label="Sênior · retorno 12 meses"
@@ -197,14 +201,6 @@ export default function LaminaPdf() {
                   <p>{d.lastro}</p>
                 </>
               ) : <p className="nota">Regulamento ainda não lido.</p>}
-              {d.segs.length > 0 && (
-                <div className="segs">
-                  {d.segs.slice(0, 5).map((s) => (
-                    <div key={s.segmento} className="seg"><span>{s.segmento}</span>
-                      <div className="bar"><i style={{ width: `${Math.max(2, s.pct * 100)}%` }} /></div><b>{p1(s.pct)}</b></div>))}
-                  <div className="nota">Carteira por segmento (Tab. II do informe).</div>
-                </div>
-              )}
             </Bloco>
             <Bloco titulo="Posição vs. pares">
               <p className="resumo">{d.paresResumo.frase}</p>
@@ -332,18 +328,18 @@ export default function LaminaPdf() {
           </table>
         </Bloco>
         <div className="lam-cols">
-          <Bloco titulo="Inadimplência > 90 dias e PDD" className="graf">
+          <Bloco titulo="Inadimplência > 90 dias (Over 90) e PDD" className="graf">
             <ResponsiveContainer width="100%" height={ALT}>
               <LineChart data={d.histo} margin={MARGEM}>
                 <XAxis dataKey="dt" tickFormatter={mesAno} tick={tick} tickLine={false} axisLine={{ stroke: C.grid }} minTickGap={28} height={18} />
-                <YAxis tickFormatter={pAx} tick={tickY(pAx)} tickLine={false} axisLine={false} width={34} {...eixo(d.histo, ['inad_90', 'pdd_carteira', 'setor_inad_90', 'setor_pdd_carteira'])} />
+                <YAxis tickFormatter={pAx} tick={tickY(pAx)} tickLine={false} axisLine={false} width={34} {...eixo(d.histo, ['inad_90', 'pdd_carteira', 'med_over90', 'med_pdd'])} />
                 <Line dataKey="inad_90" stroke={C.red} strokeWidth={2} dot={false} isAnimationActive={false} />
                 <Line dataKey="pdd_carteira" stroke={C.tealD} strokeWidth={2} dot={false} isAnimationActive={false} />
-                <Line dataKey="setor_inad_90" stroke={C.red} strokeOpacity={0.55} strokeWidth={1.3} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
-                <Line dataKey="setor_pdd_carteira" stroke={C.tealD} strokeOpacity={0.55} strokeWidth={1.3} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
+                <Line dataKey="med_over90" stroke={C.red} strokeOpacity={0.55} strokeWidth={1.3} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
+                <Line dataKey="med_pdd" stroke={C.tealD} strokeOpacity={0.55} strokeWidth={1.3} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
-            <Legenda itens={[[C.red, 'Inad. > 90d'], [C.tealD, 'PDD / carteira'], [C.red, 'Inad. · mediana', true], [C.tealD, 'PDD · mediana', true]]} />
+            <Legenda itens={[[C.red, 'Over 90 / carteira'], [C.tealD, 'PDD / carteira'], [C.red, 'Over 90 · mediana', true], [C.tealD, 'PDD · mediana', true]]} />
           </Bloco>
           <Bloco titulo="Carteira por prazo e por atraso (R$ mi)" className="graf">
             <ResponsiveContainer width="100%" height={ALT}>
@@ -382,6 +378,25 @@ export default function LaminaPdf() {
                 </table>
               ) : <p className="nota">O fundo não informou cedentes no informe.</p>}
             </Bloco>
+            <Bloco titulo="Captações e saídas · últimos 12 meses (R$ mi)" className="graf">
+              <ResponsiveContainer width="100%" height={ALT - 10}>
+                <BarChart data={d.fluxo} margin={MARGEM} barGap={1}>
+                  <XAxis dataKey="dt" tickFormatter={(v) => mesAno(v).replace('/20', '/')} tick={{ ...tick, fontSize: 6.8 }} tickLine={false}
+                    axisLine={{ stroke: C.grid }} interval={0} height={18} />
+                  <YAxis tickFormatter={mi} tick={tickY(mi)} tickLine={false} axisLine={false} width={34} {...eixo(d.fluxo, ['captacoes', 'saidas'])} />
+                  <Bar dataKey="captacoes" fill={C.tealD} isAnimationActive={false} />
+                  <Bar dataKey="saidas" fill={C.dark} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+              <Legenda itens={[[C.tealD, 'Captações (todas as classes)'], [C.dark, 'Amortizações + resgates']]} />
+            </Bloco>
+            {d.segs.length > 0 && (
+              <Bloco titulo="Carteira por segmento (Tab. II)">
+                <div className="segs">{d.segs.slice(0, 6).map((sg) => (
+                  <div key={sg.segmento} className="seg"><span>{sg.segmento}</span>
+                    <div className="bar"><i style={{ width: `${Math.max(2, sg.pct * 100)}%` }} /></div><b>{p1(sg.pct)}</b></div>))}</div>
+              </Bloco>
+            )}
           </div>
         </div>
       </Pagina>
@@ -431,7 +446,7 @@ function resumoPares(ms: Row[], nPares?: number) {
   }
 }
 
-function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra) {
+function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra, sOver: Row[], sPdd: Row[]) {
   const h = lam.cabecalho, k = lam.kpis, dt = k.dt ?? h.ultimo_informe
   const par = Object.fromEntries(ext.parametros.map((x) => [x.chave, x]))
   const parLinhas = PAR_ORDEM.map(([kk, label]) => {
@@ -460,12 +475,18 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra) {
   const base12 = hs0.length && String(hs0[0].dt) <= addMeses(dt, -12) ? lastBefore(hs0, addMeses(dt, -12)) : null
   const plVar12 = base12?.pl ? k.pl / base12.pl - 1 : null
   const subMin = par.sub_min_senior?.valor_num ?? null
-  const histo = hs.map((r) => ({ ...r, sub_min: subMin }))
+  const medOver = Object.fromEntries(sOver.map((r) => [String(r.dt), r.mediana]))
+  const medPdd = Object.fromEntries(sPdd.map((r) => [String(r.dt), r.mediana]))
+  const histo = hs.map((r) => ({ ...r, sub_min: subMin, med_over90: medOver[String(r.dt)] ?? null, med_pdd: medPdd[String(r.dt)] ?? null }))
   const plTipo = hs.map((r) => {
     const m = mPorDt[String(r.dt)]
     return { dt: r.dt, pl_senior: m?.pl_senior ?? null, pl_mezanino: m?.pl_mezanino ?? null, pl_subordinada: m?.pl_subordinada ?? null }
   })
-  const med = Object.fromEntries((lam.comparativo as Row[]).map((c) => [c.metrica, c.mediana]))
+  // medianas dos cards = as do quadro de pares (página 3)
+  const mp = Object.fromEntries((comp.metricas as Row[]).map((m) => [m.metrica, m.mediana]))
+  const med = { inad_90: mp.over90_carteira, pdd_carteira: mp.pdd_carteira, cobertura_pdd_90: mp.pdd_over90 }
+  const fluxo = men.meses.slice(0, 12).reverse().map((m) => ({
+    dt: m.dt, captacoes: m.captacoes ?? 0, saidas: (m.amortizacoes ?? 0) + (m.resgates ?? 0) }))
 
   // rentabilidade: série principal (maior PL) de cada tipo, encadeada
   const ult = men.meses[0] ?? {}
@@ -527,6 +548,11 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra) {
       return { sev: 'info', texto: `A rentabilidade da sênior informada à CVM saiu negativa no mês por causa da amortização; ` +
         `ajustada pela amortização, a ${principal.senior.rotulo} rendeu ${p(sr)} (${p1(ult[`${principal.senior.key}_pct_cdi`])} do CDI).` }
     }
+    if (a.id === 'inad_vs_setor' && med.inad_90) {   // mesma mediana do quadro de pares
+      const x = k.inad_90 / med.inad_90
+      return { sev: a.severidade, texto: `A inadimplência acima de 90 dias (${p(k.inad_90)} da carteira) está bem acima da ` +
+        `mediana dos pares (${p(med.inad_90)}${x >= 1.5 ? `, ${x.toFixed(0)} vezes maior` : ''}).` }
+    }
     return { sev: a.severidade, texto: a.texto || `${a.descricao}${a.detalhe ? ` (${a.detalhe})` : ''}` }
   })
 
@@ -545,7 +571,7 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra) {
 
   return {
     h, k, dt, par, parLinhas, plVar12, med, histo, plTipo, subMin, acum, tiposAcum, rotAcum, janelas, porSerie, senior12, sub12,
-    ult12, cdi12, seriesAtivas, notaResidual, estrutura, plSeries, rfAlerta, pares, paresDesc: comp.pares?.descricao ?? 'categoria',
+    ult12, cdi12, seriesAtivas, notaResidual, estrutura, plSeries, rfAlerta, pares, fluxo, paresDesc: comp.pares?.descricao ?? 'categoria',
     paresResumo: resumoPares(pares, comp.pares?.n), cedentes: (lam.cedentes as Row[]).slice(0, 6), alertas,
     aging: (lam.aging as Row[]).map((a) => ({ ...a, faixa: String(a.faixa).replace('>1080', '> 1080') })),
     ia, lastro: ia ? limparLastro(ia.lastro) : '', teseTitulo, segs, ficha,
