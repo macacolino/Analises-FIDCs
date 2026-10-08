@@ -59,6 +59,9 @@ export default function Fundo() {
             <div className="sub">
               {fmtCnpj(h.cnpj)} · <Link to={`/setores/${h.categoria}`}>{h.categoria_nome}</Link>
               {h.revisar && <span className="badge" style={{ marginLeft: 6 }} title="Classificação automática de baixa confiança">⚠ revisar categoria</span>}
+              {h.ia_diverge_informe && <span className="badge" style={{ marginLeft: 6 }}
+                title={`O regulamento (leitura por IA) indica tese "${h.ia_tese}", mas só ${fmtValue(h.ia_carteira_compat, 'pct')} da carteira declarada no informe CVM (Tab. II, sem os segmentos "outros") está em segmentos compatíveis. Pode ser leitura errada do regulamento, fundo fora da política ou informe preenchido no segmento errado.`}>
+                ⚠ regulamento x carteira</span>}
               {' '}<QualidadeBadge status={comp.data?.fundo?.q_status} checks={comp.data?.fundo?.q_checks} />
               {' '}· segmento CVM: {SEG[h.segmento_principal] ?? '–'} ({fmtValue(h.segmento_principal_pct, 'pct')})
             </div>

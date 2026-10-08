@@ -47,7 +47,10 @@ export default function Pesquisa() {
         <DataGrid rows={res.data} exportUrl={url} height={620}
           cols={['nome', 'cnpj', 'categoria_nome', 'gestor', 'admin', 'pl', 'inad_90', 'pdd_carteira',
                  'subordinacao', 'rentab_senior', 'ultimo_informe',
-                 { field: 'revisar', valueFormatter: (p: any) => (p.value ? 'revisar' : ''), width: 90 }]} />
+                 { field: 'revisar', valueFormatter: (p: any) => (p.value ? 'revisar' : ''), width: 90 },
+                 { field: 'ia_diverge_informe', headerName: 'Regulamento x carteira', width: 130,
+                   headerTooltip: 'A tese lida no regulamento não bate com a carteira declarada no informe CVM (Tab. II)',
+                   valueFormatter: (p: any) => (p.value ? 'diverge' : '') }]} />
       </div>
     </div>
   )

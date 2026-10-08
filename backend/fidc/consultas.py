@@ -65,8 +65,10 @@ def buscar(q: str = "", categoria: str | None = None, grupo: str | None = None,
         where.append("f.ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH")
     sql = f"""
         SELECT f.cnpj, f.nome, f.categoria, f.categoria_nome, f.grupo, f.gestor, f.admin, f.pl,
-               f.ultimo_informe, f.revisar, m.inad_90, m.pdd_carteira, m.subordinacao, m.rentab_senior
+               f.ultimo_informe, f.revisar, c.ia_diverge_informe, m.inad_90, m.pdd_carteira, m.subordinacao,
+               m.rentab_senior
         FROM fundo f LEFT JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
+        LEFT JOIN classificacao c ON c.cnpj = f.cnpj
         {'WHERE ' + ' AND '.join(where) if where else ''}
         ORDER BY f.pl DESC NULLS LAST LIMIT {int(limit)}"""
     return df(sql, params)
@@ -77,11 +79,13 @@ def lamina(cnpj: str) -> dict | None:
     cnpj = cnpj_digits(cnpj)
     cab = df("""
         SELECT f.cnpj, f.nome, f.categoria, f.categoria_nome, f.grupo, f.revisar, c.origem,
-               c.segmento_principal, c.segmento_principal_pct, f.gestor, f.admin, k.custodiante, k.auditor,
+               c.segmento_principal, c.segmento_principal_pct, c.ia_carteira_compat, c.ia_diverge_informe,
+               ia.tese AS ia_tese, f.gestor, f.admin, k.custodiante, k.auditor,
                k.data_inicio, k.situacao, k.publico_alvo, f.condominio, f.exclusivo, f.ultimo_informe,
                m.primeiro_informe
         FROM fundo f JOIN classificacao c USING (cnpj) LEFT JOIN cadastro k USING (cnpj)
         LEFT JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
+        LEFT JOIN regulamento_ia ia ON ia.cnpj = f.cnpj
         WHERE f.cnpj = ?""", [cnpj])
     if cab.empty:
         return None

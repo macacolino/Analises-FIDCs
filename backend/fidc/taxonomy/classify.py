@@ -222,6 +222,41 @@ def _leitura_ia(con) -> pd.DataFrame | None:
     return d if len(d) else None
 
 
+# Segmentos da Tabela II do informe compatíveis com cada tese da leitura por IA (checagem regulamento x carteira).
+# F8 (financeiro "outros") e I4 (setor público "outros") são vagos: muitos administradores lançam tudo ali.
+TESE_SEGMENTOS = {
+    "consignado": ["F2", "F1"], "credito_pessoal": ["F1", "F2", "H1", "C2"], "fgts": ["F1", "F2"],
+    "cartao": ["F1", "C2", "D1", "H1", "C1"], "veiculos": ["F5", "F1", "C3", "C2"],
+    "imobiliario": ["B", "F6", "F7"], "agro": ["E"], "precatorios": ["I1", "J", "D2"],
+    "judicial": ["J", "I1", "I2"], "setor_publico_outros": ["D2", "I1", "I2", "I3"],
+    "multicedente_multissacado": ["A", "B", "C1", "C2", "C3", "D1", "D3", "D4", "E", "F3", "F4", "G", "H2"],
+    "monocedente_comercial": ["A", "B", "C1", "C2", "C3", "D1", "D3", "D4", "E", "F3", "F4", "G", "H2"],
+    "risco_sacado": ["A", "C1", "C2", "D1", "F3", "F4", "H2"],
+    "corporativo": ["F3", "F4", "H2", "A", "C1", "G", "D1"],
+    "npl": ["F1", "F2", "F3", "F4", "F5", "H1", "H2", "G", "J", "C1", "C2", "D1"],
+}
+SEG_VAGOS = ["F8", "I4"]
+
+
+def checagem_informe(df: pd.DataFrame) -> pd.DataFrame:
+    """Parcela da carteira (Tab. II, sem os segmentos vagos) compatível com a tese lida no regulamento.
+    Diverge quando >= 50% da carteira está em segmentos específicos e < 30% deles batem com a tese."""
+    out = pd.DataFrame({"cnpj": df["cnpj"]})
+    out["ia_carteira_compat"] = None
+    out["ia_diverge_informe"] = False
+    if "ia_tese" not in df:
+        return out
+    espec = 1 - df[[f"sh_{s}" for s in SEG_VAGOS]].sum(axis=1)
+    compat = [sum(r[f"sh_{s}"] for s in TESE_SEGMENTOS[t]) if t in TESE_SEGMENTOS else None
+              for t, r in zip(df["ia_tese"], df.to_dict("records"))]
+    compat = pd.Series(compat, index=df.index, dtype="float64")
+    rel = (compat / espec).where((espec > 0) & ~df["sem_carteira"])
+    ok_conf = df.get("ia_confianca", pd.Series(None, index=df.index)).isin(["media", "alta"])
+    out["ia_carteira_compat"] = rel.round(4).astype(object).where(rel.notna(), None)
+    out["ia_diverge_informe"] = (ok_conf & (espec >= 0.5) & (rel < 0.3)).fillna(False).astype(bool)
+    return out
+
+
 def features(con) -> pd.DataFrame:
     df = con.execute(FEATURES_SQL).df()
     sig = _sinais_regulamento(con)
@@ -264,8 +299,11 @@ def classify_frame(df: pd.DataFrame, cats: list[Categoria] | None = None,
             c = by_id[c.alias_de]
         rows.append((f["cnpj"], c.id, c.nome, c.grupo, origem, bool(r.revisar) if r else True))
     out = pd.DataFrame(rows, columns=["cnpj", "categoria", "categoria_nome", "grupo", "origem", "revisar"])
-    return out.merge(df[["cnpj", "segmento_principal", "segmento_principal_pct", "top1_cedente_pct",
-                         "sh_cotas_fidc", "sh_aquis_inad"]], on="cnpj", how="left")
+    out = out.merge(df[["cnpj", "segmento_principal", "segmento_principal_pct", "top1_cedente_pct",
+                        "sh_cotas_fidc", "sh_aquis_inad"]], on="cnpj", how="left")
+    if "sem_carteira" in df and "sh_F8" in df:
+        out = out.merge(checagem_informe(df), on="cnpj", how="left")
+    return out
 
 
 def build_table(con) -> None:

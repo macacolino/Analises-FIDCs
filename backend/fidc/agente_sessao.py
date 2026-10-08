@@ -69,11 +69,14 @@ trabalham em paralelo na mesma pasta.
 def fila(limite: int) -> list[tuple[str, str]]:
     from .db import df
     con = ag.db()
-    lidos, antigos = {}, set()
+    lidos, antigos, medios = {}, set(), set()
     for c, r, em in con.execute("SELECT cnpj, resultado, processado_em FROM reg_ia"):
         lidos[c] = json.loads(r)
-        if lidos[c].get("confianca") == "baixa" and (em or "") < ag.TRECHOS_NUCLEO_DESDE:
-            antigos.add(c)          # lido sem o núcleo da política de investimento: reler
+        if (em or "") < ag.TRECHOS_NUCLEO_DESDE:   # lido sem o núcleo da política de investimento
+            if lidos[c].get("confianca") == "baixa":
+                antigos.add(c)      # reler já
+            elif lidos[c].get("confianca") == "media":
+                medios.add(c)       # segunda passagem: só depois de todos lidos uma vez
     ok = {c for (c,) in con.execute("SELECT cnpj FROM reg_doc WHERE status = 'ok'")}
     con.close()
     u = df("""SELECT cnpj, nome, categoria, pl FROM fundo
@@ -82,27 +85,53 @@ def fila(limite: int) -> list[tuple[str, str]]:
             "multicedente_multissacado": 2, "sem_carteira": 3}
     u = u[u.cnpj.isin(ok)].copy()
     prec = u.categoria.isin(["precatorios_federais", "precatorios", "judicial", "setor_publico_outros"])
-    # pendente: nunca lido por IA, ou precatório lido antes dos campos de taxas/foco
+    # pendente: nunca lido por IA, confiança baixa sem o núcleo, ou precatório lido antes dos campos de taxas/foco
     u["pend"] = ~u.cnpj.isin(lidos) | u.cnpj.isin(antigos) | (
         prec & u.cnpj.map(lambda c: "foco_precatorio" not in lidos.get(c, {"x": 1})))
+    if not u.pend.any():
+        u["pend"] = u.cnpj.isin(medios)
     u = u[u.pend]
     u["k"] = u.categoria.map(prio).fillna(9)
     u = u.sort_values(["k", "pl"], ascending=[True, False]).head(limite)
     return list(zip(u.cnpj, u.nome))
 
 
-def preparar(limite: int, d: str, tamanho: int = 25) -> int:
+COMPLETO = """
+ATENÇÃO: aqui `in/<CNPJ>.txt` traz o regulamento INTEIRO (não trechos), em blocos [p. N]. Leia o arquivo todo, em
+partes (Read com offset/limit), antes de gravar; os dados podem estar em anexos, suplementos e apêndices.
+"""
+
+
+def _completo(paginas: list[str]) -> str:
+    """Documento inteiro, uma página por bloco, quebrado em linhas curtas (leitura em partes pelo agente)."""
+    out = []
+    for i, p in enumerate(paginas):
+        t = re.sub(r"\s+", " ", p).strip()
+        out.append(f"[p. {i + 1}]\n" + "\n".join(t[k:k + 1200] for k in range(0, len(t), 1200)))
+    return "\n\n".join(out)
+
+
+def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = None, completo: bool = False) -> int:
+    """Monta o lote. `cnpjs` força a lista (auditoria); `completo` manda o regulamento inteiro em vez de trechos."""
     base = Path(d)
     (base / "in").mkdir(parents=True, exist_ok=True)
     (base / "out").mkdir(exist_ok=True)
-    itens = fila(limite)
+    if cnpjs:
+        from .db import df
+        nomes = dict(df("SELECT cnpj, nome FROM fundo").values)
+        itens = [(c, nomes.get(c, "")) for c in cnpjs]
+    else:
+        itens = fila(limite)
     ok = []
     for cnpj, nome in itens:
         p = ag._texto(cnpj)
         if not p:
             continue
-        t = ag.trechos(p, 30000, obrigatorias=ag._paginas_regras(cnpj))
-        (base / "in" / f"{cnpj}.txt").write_text(f"Fundo: {nome} (CNPJ {cnpj})\n\nTrechos do regulamento:\n\n{t}")
+        if completo:
+            t, rot = _completo(p), "Regulamento inteiro"
+        else:
+            t, rot = ag.trechos(p, 30000, obrigatorias=ag._paginas_regras(cnpj)), "Trechos do regulamento"
+        (base / "in" / f"{cnpj}.txt").write_text(f"Fundo: {nome} (CNPJ {cnpj})\n\n{rot}:\n\n{t}")
         ok.append(cnpj)
     k = max(1, -(-len(ok) // tamanho))
     for f in glob.glob(str(base / "lista_*.txt")):
@@ -111,7 +140,7 @@ def preparar(limite: int, d: str, tamanho: int = 25) -> int:
         (base / f"lista_{i:02d}.txt").write_text("\n".join(ok[i::k]))
     (base / "spec.json").write_text(json.dumps({"instrucoes": ag.INSTRUCOES, "schema": ag.SCHEMA}, ensure_ascii=False))
     (base / "gravar.py").write_text(GRAVAR)
-    (base / "PROMPT.md").write_text(PROMPT.format(dir=str(base.resolve())))
+    (base / "PROMPT.md").write_text(PROMPT.format(dir=str(base.resolve())) + (COMPLETO if completo else ""))
     print(json.dumps({"fundos": len(ok), "partes": k if ok else 0, "dir": str(base.resolve())}))
     return k if ok else 0
 
@@ -149,9 +178,13 @@ def main():
     ap.add_argument("acao", choices=["preparar", "importar", "pendentes"])
     ap.add_argument("--limite", type=int, default=250)
     ap.add_argument("--dir", default="/tmp/lote_ia")
+    ap.add_argument("--cnpjs", help="arquivo com um CNPJ por linha (auditoria)")
+    ap.add_argument("--completo", action="store_true", help="regulamento inteiro em vez de trechos")
+    ap.add_argument("--tamanho", type=int, default=25, help="fundos por agente")
     a = ap.parse_args()
     if a.acao == "preparar":
-        preparar(a.limite, a.dir)
+        cs = open(a.cnpjs).read().split() if a.cnpjs else None
+        preparar(a.limite, a.dir, a.tamanho, cs, a.completo)
     elif a.acao == "importar":
         print(json.dumps(importar(a.dir), ensure_ascii=False))
     else:

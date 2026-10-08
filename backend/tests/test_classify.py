@@ -127,3 +127,16 @@ def test_ia_classifica_consignado_e_tese():
     assert _ia(tese="cartao", consignado="nao_e_consignado", confianca="baixa") == "financeiro_outros"
     # nome explícito continua ganhando
     assert _ia(nome="CAJU CONSIGNADO PRIVADO FIDC", tese="consignado", consignado="inss", confianca="alta") == "consignado_privado"
+
+
+def test_checagem_regulamento_x_informe():
+    rows = [
+        {**feat(C1=1.0), "ia_tese": "consignado", "ia_confianca": "media"},          # diverge
+        {**feat(F2=0.9, C1=0.1), "ia_tese": "consignado", "ia_confianca": "alta"},  # bate
+        {**feat(F8=0.8, C1=0.2), "ia_tese": "consignado", "ia_confianca": "alta"},  # informe vago: não julga
+        {**feat(C1=1.0), "ia_tese": "consignado", "ia_confianca": "baixa"},         # leitura fraca: não julga
+        {**feat(J=1.0), "ia_tese": "outra", "ia_confianca": "alta"},                # tese sem mapa
+    ]
+    out = classify.checagem_informe(pd.DataFrame(rows))
+    assert out.ia_diverge_informe.tolist() == [True, False, False, False, False]
+    assert out.ia_carteira_compat[1] == 0.9
