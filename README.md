@@ -134,6 +134,11 @@ A tabela (AG Grid) usa os mesmos tokens.
   linha), rentabilidade por série vs. CDI (acumulada e mês a mês), PL por classe, subordinação vs. mínimo, inadimplência
   e PDD, carteira por faixa, posição vs. pares e cedentes. Abre em nova aba (`/lamina/<cnpj>`) e chama "Salvar como PDF"
   do navegador (A4, margens nenhuma, gráficos de plano de fundo marcado).
+- **PDD por administrador** (`/pdd`): (1) régua praticada, pelo informe: PDD declarada ÷ régua da Res. CMN 2.682 aplicada
+  às parcelas vencidas (piso) e curva implícita por faixa de atraso (mínimos quadrados não negativos, crescente, 12 meses);
+  (2) política escrita: nota de PDD das demonstrações financeiras no FNET lida por agente (`fidc/pdd_docs.py`; método,
+  régua por faixa, efeito vagão, provisão na compra, norma citada, trecho). `python -m fidc.agente_sessao preparar --pdd`
+  baixa as DFs e monta o lote; `importar` grava; `python -m fidc.pdd_docs --seed` exporta para `fidc/seed/pdd.json.gz`.
 - **Aba Evolução**: tabela mês a mês do informe (PL por classe, subordinação, carteira, inadimplência, PDD, CDI, rentab.
   e % CDI de cada série, captações, resgates, amortizações, aquisições, recompras, cotistas) + rentabilidade acumulada
   3/6/12/24m/início por série; botão Excel com 3 abas (`/api/fundos/<cnpj>/mensal?formato=xlsx`).

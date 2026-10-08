@@ -68,7 +68,9 @@ Extraia, no JSON pedido:
   declara que não constitui PDD - ex.: coobrigação do cedente, sem evidência de perda - sem descrever critério) ou
   "nao_descrito" (a nota não está nos trechos ou não diz o critério).
 - faixas: a régua por atraso, se houver, como lista de {de_dias, ate_dias, pct}; pct como fração (10% -> 0.10);
-  ate_dias null na última faixa (ex.: acima de 180 dias). Lista vazia se não houver tabela.
+  ate_dias null na última faixa (ex.: acima de 180 dias). Lista vazia se não houver tabela. Régua linear ou contínua
+  (ex.: 1/105 ao dia a partir do 16º dia) vira faixas de 30 dias com o pct no fim de cada faixa (1-30, 31-60, ...,
+  até chegar a 100%); diga a regra original em observacoes.
 - efeito_vagao: true se o atraso de uma parcela leva a provisionar todo o fluxo/contratos do mesmo devedor (ou sacado/
   cedente); false se o texto disser que não; null se não falar.
 - provisao_inicial: true se há provisão já na aquisição (por rating/nota do devedor ou do cedente), mesmo sem atraso.
@@ -111,8 +113,10 @@ def paginas_pdd(paginas: list[str]) -> list[int]:
             continue
         t = rg._norm(re.sub(r"\s+", " ", p))
         s = sum(min(len(re.findall(q, t)), 4) for q in _PDD) + 6 * bool(re.search(r"\d+ ?(a|ate) ?\d+ dias.{0,60}\d+[,.]?\d* ?%", t))
-        if s >= 4:
+        if s >= 2:
             pts.append((s, -i, i))
+    if any(s >= 4 for s, _, _ in pts):     # nota de PDD de verdade; senão fica com as menções genéricas
+        pts = [x for x in pts if x[0] >= 4]
     sel, total = set(), 0
     for _, _, i in sorted(pts, reverse=True):
         for j in (i, i + 1):
@@ -239,7 +243,13 @@ def _faixas_txt(fx: list[dict]) -> str | None:
         a, b = f.get("de_dias"), f.get("ate_dias")
         lab = f"> {a - 1 if a else 0} d" if b is None else f"{a or 0}-{b} d"
         return f"{lab}: {f['pct'] * 100:.4g}%".replace(".", ",")
-    return " · ".join(faixa(f) for f in sorted(fx, key=lambda f: (f.get("de_dias") or 0)))
+    junto: list[dict] = []          # faixas seguidas com o mesmo % viram uma só
+    for f in sorted(fx, key=lambda f: (f.get("de_dias") or 0)):
+        if junto and abs(junto[-1]["pct"] - f["pct"]) < 1e-9:
+            junto[-1] = {**junto[-1], "ate_dias": f.get("ate_dias")}
+        else:
+            junto.append(dict(f))
+    return " · ".join(faixa(f) for f in junto)
 
 
 def _linhas() -> list[dict]:
