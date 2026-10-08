@@ -1,4 +1,4 @@
-import { NavLink, Route, Routes } from 'react-router-dom'
+import { NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import { useMeta } from './api'
 import { fmtDate, mesAno } from './fmt'
 import Comparar from './pages/Comparar'
@@ -6,6 +6,7 @@ import Fundo from './pages/Fundo'
 import Glossario from './pages/Glossario'
 import Grupos from './pages/Grupos'
 import Qualidade from './pages/Qualidade'
+import LaminaPdf from './pages/LaminaPdf'
 import Lista from './pages/Lista'
 import Mercado from './pages/Mercado'
 import Oportunidades from './pages/Oportunidades'
@@ -14,6 +15,10 @@ import Setor from './pages/Setor'
 
 export default function App() {
   const meta = useMeta()
+  const loc = useLocation()
+  if (loc.pathname.startsWith('/lamina/')) {
+    return <Routes><Route path="/lamina/:cnpj" element={<LaminaPdf />} /></Routes>
+  }
   return (
     <>
       <header className="topbar">

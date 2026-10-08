@@ -6,7 +6,7 @@ import { Bars, TimeLines } from '../components/Charts'
 import { DataGrid } from '../components/DataGrid'
 import { Alertas, Kpi, Loading, Tabs, type Alerta } from '../components/ui'
 import ComparePanel, { defaultPeers, PeerSelector, RedFlagChip, type PeerOpts } from '../components/Comparar'
-import { Casa, Mudancas, QualidadeBadge, QualidadeFundo, Regulamento, Roteiro, Safras, Stress } from './FundoTabs'
+import { Casa, Mudancas, QualidadeBadge, QualidadeFundo, Regulamento, ResumoMensal, Roteiro, Safras, Stress } from './FundoTabs'
 import { fmtCnpj, fmtDate, fmtValue, mesAno } from '../fmt'
 
 type Lamina = {
@@ -72,6 +72,8 @@ export default function Fundo() {
             <button className={listas.includes('watchlist') ? 'primary' : ''} onClick={() => toggle('watchlist')}>
               {listas.includes('watchlist') ? '✓ Na watchlist' : '+ Watchlist'}</button>
             <Link className="btn" to={`/comparar?cnpj=${cnpj}`}>Comparar</Link>
+            <a className="btn primary" href={`/lamina/${cnpj}?print=1`} target="_blank" rel="noreferrer"
+              title="Relatório de 3 páginas A4 para a diretoria; abre em nova aba e chama Salvar como PDF">⬇ Lâmina PDF</a>
             <a className="btn" href={`/api/fundos/${cnpj}/lamina.xlsx`}>⬇ Lâmina Excel</a>
             <a className="btn" href={`/api/fundos/${cnpj}/comite.xlsx`}>⬇ Pacote do comitê</a>
           </div>
@@ -149,6 +151,7 @@ export default function Fundo() {
               series={[{ key: 'rentab_subordinada', label: 'Fundo' }, { key: 'setor_rentab_subordinada', label: 'Mediana da categoria', dashed: true, color: 'var(--muted)' }]} />
           </div>
         )}
+        {tab === 'geral' && <ResumoMensal cnpj={cnpj} />}
         {tab === 'safra' && hist.data && (
           <div className="stack">
             <Safras cnpj={cnpj} />

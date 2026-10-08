@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from .. import appdb, catalogo, comparacao as cp, config, consultas, excel
+from .. import appdb, catalogo, comparacao as cp, config, consultas, excel, mensal
 from ..db import df
 
 router = APIRouter(prefix="/api")
@@ -264,6 +264,65 @@ def derivados_regulamento(cnpj: str) -> list[dict]:
         out.append({"metrica": "Responsabilidade limitada", "valor": None, "fmt": "txt", "red_flag": "RF21 V (trava)",
                     "fonte": pr["responsabilidade_limitada"]["fonte"]})
     return out
+
+
+@router.get("/fundos/{cnpj}/mensal")
+def fundo_mensal(cnpj: str, meses: int = 60, formato: str | None = None):
+    """Resumo mês a mês (informe CVM) com rentabilidade por série ajustada por amortização."""
+    c = consultas.cnpj_digits(cnpj)
+    if formato == "xlsx":
+        notas = {"Resumo mensal": "Fonte: informe mensal CVM. Rentabilidade por série: informada pelo administrador ou, "
+                                  "quando ela não considera a amortização do mês, recalculada (estimativa).",
+                 "Rentab. por série": "rentab = valor usado; ajuste_amortizacao = verdadeiro quando foi recalculada "
+                                      "com a amortização do tipo de cota (Tab. X.4) dividida pelas cotas do tipo."}
+        return _xlsx(mensal.planilhas(c, meses), f"mensal_{c}", notas)
+    t = mensal.tabela(c, meses)
+    return {"meses": excel.json_safe(t["meses"]), "series": t["series"], "janelas": excel.json_safe(t["janelas"])}
+
+
+SEG_NOMES = {
+    "A": "Industrial", "B": "Imobiliário", "C1": "Comercial", "C2": "Varejo", "C3": "Arrendamento", "D1": "Serviços",
+    "D2": "Serviços públicos", "D3": "Educação", "D4": "Entretenimento", "E": "Agronegócio", "F1": "Crédito pessoal",
+    "F2": "Consignado", "F3": "Corporativo", "F4": "Middle market", "F5": "Veículos", "F6": "Imob. empresarial",
+    "F7": "Imob. residencial", "F8": "Financeiro - outros", "G": "Cartão de crédito", "H1": "Factoring PF",
+    "H2": "Factoring PJ", "I1": "Precatórios", "I2": "Tributário", "I3": "Royalties", "I4": "Setor público - outros",
+    "J": "Ações judiciais", "K": "Marcas/PI"}
+
+
+@router.get("/fundos/{cnpj}/lamina-extra")
+def lamina_extra(cnpj: str):
+    """Complementos da lâmina em PDF: parâmetros do regulamento (manual > IA > regras), segmentos da carteira (Tab. II)
+    e leitura do regulamento por IA."""
+    c = consultas.cnpj_digits(cnpj)
+    pcat = yaml.safe_load(open(ROTEIROS_FILE, encoding="utf-8"))["parametros"]
+    par = []
+    for k, p in _param_atual(c).items():
+        meta = pcat.get(k)
+        if not meta or k.startswith("eventos"):
+            continue
+        v = p.get("valor_num")
+        par.append({"chave": k, "label": meta[0], "fmt": meta[1],
+                    "valor_num": None if v is None or pd.isna(v) else float(v), "valor_txt": p.get("valor_txt"),
+                    "fonte": p.get("fonte"), "manual": not p.get("auto")})
+    seg = df(f"""SELECT {', '.join(f'seg_{k}' for k in SEG_NOMES)}, seg_total FROM fundo_mes
+                 WHERE cnpj = ? ORDER BY dt DESC LIMIT 1""", [c])
+    segs = []
+    if not seg.empty:
+        r = seg.iloc[0]
+        tot = sum(max(float(r[f"seg_{k}"] or 0), 0) for k in SEG_NOMES)
+        if tot > 0:
+            segs = sorted(({"segmento": n, "pct": max(float(r[f"seg_{k}"] or 0), 0) / tot}
+                           for k, n in SEG_NOMES.items() if (r[f"seg_{k}"] or 0) > 0), key=lambda x: -x["pct"])
+    try:
+        ia = df("SELECT tese, lastro, consignado, foco_precatorio, precatorio_alimentar, confianca, observacoes, "
+                "processado_em FROM regulamento_ia WHERE cnpj = ?", [c]).to_dict("records")
+    except Exception:  # noqa: BLE001
+        ia = []
+    try:
+        doc = df("SELECT data_entrega, url_ver FROM regulamento WHERE cnpj = ?", [c]).to_dict("records")
+    except Exception:  # noqa: BLE001
+        doc = []
+    return _clean({"parametros": par, "segmentos": segs, "ia": ia[0] if ia else None, "regulamento": doc[0] if doc else None})
 
 
 @router.get("/fundos/{cnpj}/regulamento")

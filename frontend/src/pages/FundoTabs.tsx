@@ -369,3 +369,55 @@ export function AgingBars({ data }: { data: Row[] }) {
   return <Bars title="Carteira por prazo: a vencer vs. vencido" data={data} x="faixa" fmt="brl"
     series={[{ key: 'a_vencer', label: 'A vencer (por prazo)' }, { key: 'vencido', label: 'Vencido (por atraso)' }]} />
 }
+
+/* ---------- resumo mês a mês (informe CVM) + rentabilidade por série ---------- */
+export type MensalResp = {
+  meses: Row[]
+  series: { key: string; serie: string; tipo: string; rotulo: string }[]
+  janelas: Row[]
+}
+
+export function ResumoMensal({ cnpj }: { cnpj: string }) {
+  const d = useApi<MensalResp>(`/api/fundos/${cnpj}/mensal?meses=60`)
+  if (!d.data) return <Loading q={d} />
+  const { meses, series, janelas } = d.data
+  const ativas = series.filter((s) => meses.some((m) => m[`${s.key}_rentab`] != null))
+  const cols: any[] = [
+    'dt', 'pl', 'pl_senior', 'pl_mezanino', 'pl_subordinada', 'subordinacao', 'subordinacao_junior', 'carteira',
+    'inad_90', 'inad_total', 'pdd_carteira', 'cobertura_pdd_90', 'cdi_mes',
+    ...ativas.flatMap((s) => [
+      { field: `${s.key}_rentab`, headerName: `${s.rotulo} · mês`, fmt: 'pct', width: 120,
+        headerTooltip: `${s.serie}: rentabilidade do mês (ajustada por amortização quando a informada não a considera)` },
+      { field: `${s.key}_pct_cdi`, headerName: `${s.rotulo} · %CDI`, fmt: 'pct', width: 120,
+        headerTooltip: `${s.serie}: rentabilidade do mês / CDI do mês` },
+    ]),
+    'captacoes', 'resgates', 'amortizacoes', 'aquisicoes', 'recompras', 'prazo_medio_dias', 'top1_cedente_pct',
+    'nr_cotistas',
+  ]
+  return (
+    <div className="stack" style={{ marginTop: 16 }}>
+      {janelas.length > 0 && (
+        <div>
+          <h3>Rentabilidade acumulada por série vs. CDI</h3>
+          <table className="simple">
+            <thead><tr><th>Série</th>{['3 meses', '6 meses', '12 meses', '24 meses', 'Desde o início*'].map((h) => (
+              <th key={h} className="r" colSpan={2}>{h}</th>))}</tr>
+              <tr><th />{['3m', '6m', '12m', '24m', 'inicio'].flatMap((k) => [
+                <th key={k + 'c'} className="r muted">cota</th>, <th key={k + 'p'} className="r muted">% CDI</th>])}</tr></thead>
+            <tbody>{janelas.map((j) => (
+              <tr key={j.serie} title={j.serie}><td>{j.rotulo}</td>
+                {['3m', '6m', '12m', '24m', 'inicio'].flatMap((k) => [
+                  <td key={k + 'c'} className="r num">{fmtValue(j[`cota_${k}`], 'pct')}</td>,
+                  <td key={k + 'p'} className="r num muted">{fmtValue(j[`pct_cdi_${k}`], 'pct')}</td>])}</tr>))}</tbody>
+          </table>
+          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            * desde o primeiro mês da série no informe. Janela só aparece com todos os meses disponíveis.
+            Rentabilidade ajustada por amortização quando o administrador informou a variação crua da cota (estimativa).
+          </div>
+        </div>
+      )}
+      <DataGrid title="Mês a mês (informe CVM)" rows={meses} cols={cols} height={460}
+        exportUrl={`/api/fundos/${cnpj}/mensal?meses=120`} />
+    </div>
+  )
+}

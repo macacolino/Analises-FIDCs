@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+/* Lâmina A4 - identidade Ouribank (sempre clara, independe do tema do app) */
+.lam {
+  --dark: #15252D; --dark2: #23363D; --teal: #76D2D7; --tealL: #96DFE5; --tealD: #428087;
+  --bg: #F4F5F7; --mutedD: #5B6E78; --mutedL: #A8B5BC; --grid: #DCE2E6; --red: #C25450; --amber: #C99A2E;
+  font-family: 'Poppins', sans-serif; color: var(--dark); background: #8a969c; padding: 16px 0 40px;
+  font-size: 9.5px; line-height: 1.35;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.lam * { box-sizing: border-box; font-family: inherit; }
+.lam-wait { font-family: 'Poppins', sans-serif; padding: 40px; color: #5B6E78; }
+.lam-toolbar { width: 210mm; margin: 0 auto 12px; display: flex; gap: 12px; align-items: center; color: #fff; font-size: 11px; }
+.lam-toolbar button { background: var(--dark); color: #fff; border: 0; border-radius: 6px; padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 12px; }
+
+.lam-page {
+  width: 210mm; height: 297mm; margin: 0 auto 14px; background: var(--bg); position: relative; overflow: hidden;
+  display: flex; flex-direction: column; box-shadow: 0 2px 14px rgba(0,0,0,.25);
+}
+.lam-body { flex: 1; padding: 0 11mm; display: flex; flex-direction: column; gap: 3.2mm; }
+.lam-foot { display: flex; gap: 8mm; align-items: flex-end; padding: 2.5mm 11mm 5mm; color: var(--mutedD); font-size: 7px; border-top: 0.5px solid var(--grid); margin: 0 11mm; padding-left: 0; padding-right: 0; }
+.lam-foot .pg { margin-left: auto; font-size: 8px; white-space: nowrap; }
+
+/* cabeçalho das páginas internas */
+.lam-mini { display: flex; align-items: center; gap: 10px; padding: 7mm 11mm 3mm; font-size: 8px; color: var(--mutedD); }
+.lam-mini img { height: 12px; }
+.lam-mini .sp { flex: 1; }
+.lam-mini span:nth-child(2) { font-weight: 600; color: var(--dark); }
+.lam-titulo { font-size: 15px; font-weight: 700; margin: 0 0 1mm; position: relative; padding-top: 2.5mm; }
+.lam-titulo::before { content: ''; position: absolute; top: 0; left: 0; width: 11mm; height: 1.2mm; background: var(--teal); }
+
+/* capa (topo da página 1) */
+.lam-capa { margin: 0 -11mm; background: var(--dark); color: #fff; padding: 9mm 11mm 8mm; position: relative; overflow: hidden; }
+.lam-capa .logo { height: 16px; display: block; margin-bottom: 7mm; }
+.lam-capa .kick { color: var(--teal); font-weight: 700; font-size: 8.5px; letter-spacing: 2.2px; }
+.lam-capa h1 { font-size: 21px; font-weight: 700; margin: 1.5mm 0 1.5mm; max-width: 150mm; line-height: 1.15; }
+.lam-capa .sub { color: var(--mutedL); font-size: 9.5px; max-width: 160mm; }
+.lam-capa .arc { position: absolute; border-radius: 50%; border: 1.3px solid var(--tealL); opacity: .55; }
+.lam-capa .a1 { width: 70mm; height: 70mm; right: -22mm; top: -26mm; }
+.lam-capa .a2 { width: 46mm; height: 46mm; right: -6mm; top: 16mm; border-color: var(--teal); opacity: .35; }
+.lam-capa .dotc { position: absolute; width: 3.5mm; height: 3.5mm; border-radius: 50%; background: var(--tealL); right: 38mm; top: 30mm; }
+
+/* KPIs */
+.lam-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2.6mm; }
+.lam-kpi { background: #fff; border: 0.5px solid var(--grid); border-top: 1.4mm solid var(--teal); padding: 2.6mm 3mm 2.4mm; box-shadow: 0 1px 6px rgba(21,37,45,.07); }
+.lam-kpi.alerta { border-top-color: var(--red); }
+.lam-kpi .v { font-size: 15px; font-weight: 700; letter-spacing: -.2px; }
+.lam-kpi.alerta .v { color: var(--red); }
+.lam-kpi .l { font-weight: 600; font-size: 8.5px; margin-top: .5mm; }
+.lam-kpi .h { font-style: italic; color: var(--tealD); font-size: 7.8px; margin-top: .6mm; }
+
+/* blocos */
+.lam-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 3.2mm; align-items: start; }
+.lam-cols > div { display: flex; flex-direction: column; gap: 3.2mm; }
+.lam-bloco { background: #fff; border: 0.5px solid var(--grid); padding: 2.8mm 3.2mm 3mm; box-shadow: 0 1px 6px rgba(21,37,45,.05); }
+.lam-bloco h3 { font-size: 9.5px; font-weight: 700; margin: 0 0 2mm; display: flex; align-items: center; gap: 2mm; text-transform: none; }
+.lam-bloco h3 i { width: 1mm; height: 3.2mm; background: var(--teal); display: inline-block; }
+.lam-bloco h4 { font-size: 8.5px; margin: 2.5mm 0 1mm; }
+.lam-bloco p { margin: 0 0 1.5mm; }
+.lam .muted { font-size: inherit; }
+.lam .nota { color: var(--mutedD); font-size: 7.3px; margin-top: 1.4mm; font-style: italic; }
+.lam .ok { color: var(--tealD); font-weight: 600; }
+
+.lam-ficha { width: 100%; border-collapse: collapse; }
+.lam-ficha th { text-align: left; font-weight: 500; color: var(--mutedD); padding: .9mm 2mm .9mm 0; width: 40%; vertical-align: top; border-bottom: 0.5px solid #EEF1F3; }
+.lam-ficha td { padding: .9mm 0; font-weight: 600; border-bottom: 0.5px solid #EEF1F3; }
+.lam-ficha .fonte { display: block; font-weight: 400; font-size: 6.8px; color: var(--mutedL); }
+
+.lam .tese { font-weight: 700; color: var(--tealD); font-size: 10.5px; margin-bottom: 1mm; }
+.lam .segs { margin-top: 2mm; }
+.lam .seg { display: grid; grid-template-columns: 34mm 1fr 12mm; gap: 2mm; align-items: center; margin: .7mm 0; }
+.lam .seg .bar { height: 2.2mm; background: #EEF1F3; }
+.lam .seg .bar i { display: block; height: 100%; background: var(--tealD); }
+.lam .seg b { text-align: right; }
+
+/* red flags */
+.lam .rf { border-left: 1mm solid var(--amber); background: #FBF6EA; padding: 1.6mm 2.4mm; margin-bottom: 1.6mm; }
+.lam .rf.vermelho { border-left-color: var(--red); background: #F8ECEB; }
+.lam .rf-h { display: flex; gap: 2mm; align-items: center; }
+.lam .rf-d { margin-top: .6mm; }
+.lam .rf-r { color: var(--mutedD); font-size: 7.2px; margin-top: .4mm; }
+.lam .chip { font-size: 6.8px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; padding: .3mm 1.6mm; border-radius: 1mm; background: var(--amber); color: #fff; white-space: nowrap; }
+.lam .rf.vermelho .chip { background: var(--red); }
+.lam .chip.verde { background: var(--tealD); margin-right: 1.6mm; }
+.lam .rf-verde { margin-top: 1.4mm; font-size: 7.6px; color: var(--dark2); line-height: 1.5; }
+
+/* tabelas */
+.lam-tab { width: 100%; border-collapse: collapse; font-size: 8px; }
+.lam-tab th { text-align: left; font-weight: 600; color: var(--mutedD); border-bottom: 0.8px solid var(--dark); padding: .8mm 1mm; font-size: 7.4px; }
+.lam-tab td { padding: .75mm 1mm; border-bottom: 0.5px solid #EEF1F3; }
+.lam-tab .r { text-align: right; white-space: nowrap; }
+.lam-tab .b { font-weight: 700; }
+.lam-tab .muted, .lam-tab td.muted { color: var(--mutedD); }
+.lam-tab .sub { display: block; color: var(--mutedD); font-size: 6.8px; }
+.lam-tab tr.tot td { font-weight: 700; border-top: 0.8px solid var(--dark); border-bottom: 0; }
+.lam-tab.mensal td, .lam-tab.mensal th { font-size: 7.2px; padding: .55mm .8mm; }
+.lam-tab.mensal tr.cota td { border-bottom: 0; font-weight: 600; }
+.lam-tab.mensal tr.cota td:first-child { font-weight: 700; vertical-align: top; border-bottom: 0.5px solid #EEF1F3; }
+.lam-tab.mensal tr.cdi td { background: #EEF1F3; font-weight: 600; }
+.lam-tab .neg { color: var(--red); }
+.lam .pos { display: inline-block; width: 2.2mm; height: 2.2mm; border-radius: 50%; background: var(--mutedL); vertical-align: middle; }
+.lam .pos.favoravel { background: var(--tealD); }
+.lam .pos.desfavoravel { background: var(--red); }
+
+.lam .leg { display: flex; gap: 3mm; flex-wrap: wrap; color: var(--mutedD); font-size: 7.2px; margin-top: 1mm; }
+.lam .leg i { display: inline-block; width: 2.4mm; height: 2.4mm; margin-right: 1mm; vertical-align: middle; }
+.lam .alertas { margin: 0; padding-left: 3.5mm; }
+.lam .alertas li { margin: .5mm 0; }
+.lam .alertas li.alta { color: var(--red); }
+.lam .recharts-surface { overflow: visible; }
+
+@page { size: A4; margin: 0; }
+@media print {
+  html, body { background: #fff !important; margin: 0; }
+  .lam { background: none; padding: 0; }
+  .lam-toolbar { display: none; }
+  .lam-page { margin: 0; box-shadow: none; page-break-after: always; break-after: page; }
+  .lam-page:last-child { page-break-after: auto; break-after: auto; }
+}

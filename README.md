@@ -120,6 +120,20 @@ O regulamento vigente de cada fundo é baixado do FNET (B3) — **gratuito, sem 
 - **Tabelas**: busca geral (sem acento) e filtro sob cada coluna na unidade exibida: `>5`, `<=1,5`, `5-10` (percentuais
   em %, valores em R$ milhões), texto, `a|b` (ou), `-termo` (exclui).
 
+## Lâmina em PDF e resumo mensal
+- **Lâmina PDF** (botão na página do fundo): 3 páginas A4 na identidade Ouribank para a diretoria — KPIs, características,
+  parâmetros do regulamento (manual > IA > regras), tese e lastro, red flags atingidas (vermelho/amarelo, verdes em uma
+  linha), rentabilidade por série vs. CDI (acumulada e mês a mês), PL por classe, subordinação vs. mínimo, inadimplência
+  e PDD, carteira por faixa, posição vs. pares e cedentes. Abre em nova aba (`/lamina/<cnpj>`) e chama "Salvar como PDF"
+  do navegador (A4, margens nenhuma, gráficos de plano de fundo marcado).
+- **Aba Evolução**: tabela mês a mês do informe (PL por classe, subordinação, carteira, inadimplência, PDD, CDI, rentab.
+  e % CDI de cada série, captações, resgates, amortizações, aquisições, recompras, cotistas) + rentabilidade acumulada
+  3/6/12/24m/início por série; botão Excel com 3 abas (`/api/fundos/<cnpj>/mensal?formato=xlsx`).
+- **Rentabilidade ajustada por amortização**: vários administradores informam na Tab. X.3 a variação crua da cota, que
+  cai no mês da amortização. Quando isso acontece, usamos (cota + amortização por cota) / cota anterior − 1, com a
+  amortização do tipo de cota (Tab. X.4) dividida pelas cotas do tipo — estimativa (séries do mesmo tipo podem amortizar
+  valores diferentes por cota).
+
 ## Páginas
 | Página | O que tem |
 |---|---|

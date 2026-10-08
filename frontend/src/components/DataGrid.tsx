@@ -20,7 +20,8 @@ const theme = themeQuartz.withParams({
   wrapperBorderRadius: 10,
 })
 
-type ColSpec = string | (ColDef & { field: string })
+/** coluna: nome do campo (rótulo/formato do dicionário) ou ColDef; `fmt` força o formato de campos fora do dicionário */
+export type ColSpec = string | (ColDef & { field: string; fmt?: string })
 
 /* ---------- filtros: expressões na unidade exibida (% como %, R$ em milhões) ---------- */
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -96,8 +97,9 @@ export function DataGrid({ rows, cols, exportUrl, height = 520, title, extra, pi
   }, [])
   const colDefs = useMemo<ColDef[]>(() => cols.map((c, i) => {
     const field = typeof c === 'string' ? c : c.field
-    const base: ColDef = typeof c === 'string' ? { field } : { ...c }
-    const f = colFmt(dic, field)
+    const { fmt: fmtForcado, ...resto } = typeof c === 'string' ? { fmt: undefined } : c
+    const base: ColDef = typeof c === 'string' ? { field } : resto
+    const f = fmtForcado ?? colFmt(dic, field)
     const numeric = !!f && f !== 'txt' && f !== 'data'
     const def: ColDef = {
       headerName: colLabel(dic, field),
