@@ -26,7 +26,7 @@ WITH f AS (
   FROM f GROUP BY ALL
 ), b AS (
   SELECT m.cnpj, m.dt, m.pl, m.dc_bruto, m.pdd, m.pl_senior, m.pl_mezanino, m.pl_subordinada,
-         m.subordinacao, m.rentab_subordinada, m.aging_suspeito, m.pl_outlier,
+         m.subordinacao, m.rentab_subordinada, m.sub_residual, m.aging_suspeito, m.pl_outlier,
          m.in_30, m.in_60, m.in_90, m.in_120, m.in_150, m.in_180, m.in_360, m.in_720, m.in_1080, m.in_1080p,
          m.av_30, m.recompras, fm.recompras_contabil, m.aquisicoes, fm.aquisicoes_com_risco,
          m.taxa_desconto_compra, m.top1_cedente_pct, m.prazo_medio_dias, m.primeiro_informe,
@@ -49,7 +49,7 @@ WITH f AS (
 ), w AS (
   SELECT *,
     lag(dt) OVER p AS dt_ant,
-    lag(pl_subordinada) OVER p AS jr_ant,
+    lag(pl_subordinada) OVER p AS jr_ant, lag(sub_residual) OVER p AS sub_residual_ant,
     lag(vencidos_180) OVER p AS v180_ant, lag(in_180) OVER p AS v151_180_ant,
     lag(pdd, 12) OVER p AS pdd_12m, lag(vencidos_180, 12) OVER p AS v180_12m, lag(dt, 12) OVER p AS dt_12m,
     lag(pl, 12) OVER p AS pl_12m, lag(pl_subordinada, 12) OVER p AS jr_12m,
@@ -65,7 +65,11 @@ WITH f AS (
          THEN greatest(coalesce(v180_ant, 0) + coalesce(v151_180_ant, 0) - coalesce(vencidos_180, 0), 0) END AS baixas_mes,
     -- resultado da Jr no mês = ΔPL Jr + saídas (resgates + amortizações) - captações
     CASE WHEN date_diff('month', dt_ant, dt) = 1
-         THEN pl_subordinada - jr_ant + coalesce(saida_jr, 0) - coalesce(cap_jr, 0) END AS resultado_jr_mes
+         THEN pl_subordinada - jr_ant + coalesce(saida_jr, 0) - coalesce(cap_jr, 0) END AS resultado_jr_mes,
+    -- rentabilidade da Jr: a informada, ou a do resíduo do PL quando a soma das séries não fechou (mês ou anterior)
+    CASE WHEN (sub_residual OR coalesce(sub_residual_ant, false)) AND date_diff('month', dt_ant, dt) = 1 AND jr_ant > 0
+         THEN 100 * (pl_subordinada - jr_ant + coalesce(saida_jr, 0) - coalesce(cap_jr, 0)) / jr_ant
+         ELSE rentab_subordinada END AS rentab_jr
   FROM w
 ), r AS (
   SELECT *,
@@ -87,9 +91,9 @@ WITH f AS (
       / nullif(sum(aquisicoes_com_risco) FILTER (WHERE taxa_desconto_compra BETWEEN 12 AND 100) OVER y, 0) AS taxa_ix_12m,
     sum(aquisicoes_com_risco) FILTER (WHERE taxa_desconto_compra BETWEEN 12 AND 100) OVER y
       / nullif(sum(aquisicoes) OVER y, 0) AS taxa_ix_cobertura,
-    exp(sum(ln(1 + rentab_subordinada / 100)) FILTER (WHERE rentab_subordinada > -100) OVER y) - 1 AS retorno_jr_12m,
-    count(rentab_subordinada) OVER y AS n_retorno_jr,
-    count(*) FILTER (WHERE rentab_subordinada < 0) OVER y AS meses_jr_negativa_12m,
+    exp(sum(ln(greatest(1 + rentab_jr / 100, 1e-9))) FILTER (WHERE rentab_jr > -100) OVER y) - 1 AS retorno_jr_12m,
+    count(rentab_jr) OVER y AS n_retorno_jr,
+    count(*) FILTER (WHERE rentab_jr < 0) OVER y AS meses_jr_negativa_12m,
     sum(coalesce(saida_sr, 0) - coalesce(cap_sr, 0)) OVER y AS resgate_liquido_sr_12m
   FROM w2
   WINDOW y AS (PARTITION BY cnpj ORDER BY dt RANGE BETWEEN INTERVAL 11 MONTH PRECEDING AND CURRENT ROW),
@@ -99,11 +103,11 @@ WITH f AS (
   SELECT cnpj, dt, max(run) OVER (PARTITION BY cnpj ORDER BY dt RANGE BETWEEN INTERVAL 11 MONTH PRECEDING AND CURRENT ROW) AS jr_neg_seguidos
   FROM (SELECT cnpj, dt,
                -- negativos acumulados dentro do bloco iniciado no último mês não negativo
-               sum(CASE WHEN rentab_subordinada < 0 THEN 1 ELSE 0 END)
+               sum(CASE WHEN rentab_jr < 0 THEN 1 ELSE 0 END)
                  OVER (PARTITION BY cnpj, grp ORDER BY dt) AS run
-        FROM (SELECT cnpj, dt, rentab_subordinada,
-                     sum(CASE WHEN rentab_subordinada < 0 THEN 0 ELSE 1 END) OVER (PARTITION BY cnpj ORDER BY dt) AS grp
-              FROM b))
+        FROM (SELECT cnpj, dt, rentab_jr,
+                     sum(CASE WHEN rentab_jr < 0 THEN 0 ELSE 1 END) OVER (PARTITION BY cnpj ORDER BY dt) AS grp
+              FROM w2))
 )
 SELECT r.cnpj, r.dt,
   r.pl_subordinada AS jr, r.pl_mezanino AS mz, r.pl_senior AS sr, r.n12 AS meses_janela,

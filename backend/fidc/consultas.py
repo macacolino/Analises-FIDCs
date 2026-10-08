@@ -327,12 +327,15 @@ def alertas(cnpjs: list[str]) -> dict[str, list[dict]]:
         for rid, desc, fn, sev in REGRAS_ALERTA:
             try:
                 if fn(a, b, s):
-                    lst.append({"id": rid, "descricao": desc, "severidade": sev, "detalhe": _detalhe_alerta(rid, a, b, s)})
+                    lst.append({"id": rid, "descricao": desc, "severidade": sev, "detalhe": _detalhe_alerta(rid, a, b, s),
+                                "texto": _texto_alerta(rid, a, b, s)})
             except (TypeError, ZeroDivisionError):
                 pass
         if pd.Timestamp(a["dt"]) < ref:
             lst.append({"id": "informe_atrasado", "severidade": "media",
-                        "descricao": f"Último informe na CVM é de {pd.Timestamp(a['dt']):%m/%Y}"})
+                        "descricao": f"Último informe na CVM é de {pd.Timestamp(a['dt']):%m/%Y}",
+                        "texto": f"O fundo ainda não entregou o informe de {ref:%m/%Y}; o último na CVM é de "
+                                 f"{pd.Timestamp(a['dt']):%m/%Y}."})
         out[cnpj] = lst
     return out
 
@@ -400,6 +403,40 @@ def relatorio_lista(tipo: str) -> dict[str, pd.DataFrame]:
 
 def _pp(v, casas=2):
     return "n/d" if v is None or pd.isna(v) else f"{v * 100:.{casas}f}%".replace(".", ",")
+
+
+def _texto_alerta(rid, a, b, s) -> str:
+    """Frase completa, em português corrente, para relatórios (lâmina): o que aconteceu, com os números."""
+    b = b or {}
+    s = s or {}
+    if rid == "subordinacao_queda":
+        return (f"A subordinação caiu de {_pp(b.get('subordinacao'), 1)} para {_pp(a.get('subordinacao'), 1)} do PL em "
+                "3 meses: o colchão que protege a sênior ficou mais fino.")
+    if rid == "inad_alta":
+        return (f"A inadimplência acima de 90 dias subiu de {_pp(b.get('inad_90'))} para {_pp(a.get('inad_90'))} da "
+                "carteira em 3 meses.")
+    if rid == "inad_vs_setor":
+        med = s.get("inad_90_mediana")
+        mult = f", {_v(a, 'inad_90') / med:.0f} vezes maior" if med else ""
+        return (f"A inadimplência acima de 90 dias ({_pp(a.get('inad_90'))} da carteira) está bem acima da mediana "
+                f"da categoria ({_pp(med)}{mult}).")
+    if rid == "pdd_alta":
+        return f"A provisão (PDD) passou de {_pp(b.get('pdd_carteira'))} para {_pp(a.get('pdd_carteira'))} da carteira em 3 meses."
+    if rid == "recompra":
+        return (f"O cedente recomprou ou substituiu {_pp(a.get('recompra_subst_3m_carteira'))} da carteira nos últimos "
+                "3 meses; recompra alta pode esconder atraso.")
+    if rid == "roll_alto":
+        return (f"{_pp(a.get('roll_60_90'), 0)} do saldo que estava com 31 a 60 dias de atraso passou para 61 a 90 dias "
+                "no mês: quem atrasa não está voltando a pagar.")
+    if rid == "pl_queda":
+        return f"O PL caiu de R$ {_v(b, 'pl') / 1e6:,.1f} mi para R$ {_v(a, 'pl') / 1e6:,.1f} mi em 3 meses.".replace(
+            ",", "X").replace(".", ",").replace("X", ".")
+    if rid == "rentab_senior_neg":
+        return (f"A cota sênior teve rentabilidade de {_v(a, 'rentab_senior'):.2f}% no mês, pela informação do "
+                "administrador (média das séries ponderada pelo PL).").replace(".", ",", 1)
+    if rid == "concentracao":
+        return f"O maior cedente responde por {_v(a, 'top1_cedente_pct'):.1f}% da carteira.".replace(".", ",")
+    return ""
 
 
 def _detalhe_alerta(rid, a, b, s) -> str:

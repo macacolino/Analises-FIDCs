@@ -117,3 +117,25 @@
   .lam-page { margin: 0; box-shadow: none; page-break-after: always; break-after: page; }
   .lam-page:last-child { page-break-after: auto; break-after: auto; }
 }
+
+/* v2: alinhamentos e novos elementos */
+.lam-cols { align-items: stretch; }
+.lam-cols > .lam-bloco { display: flex; flex-direction: column; }
+.lam-kpi { display: flex; flex-direction: column; min-height: 17.5mm; }
+.lam-kpi .h { min-height: 3mm; }
+.lam .lam-aviso { font-size: 7.2px; color: var(--mutedD); font-style: italic; margin-top: -1.6mm; }
+.lam .resumo { font-weight: 600; margin-bottom: 1.2mm; }
+.lam .dest { margin: .6mm 0; padding-left: 2mm; border-left: .8mm solid var(--grid); }
+.lam .dest.dest-pos { border-left-color: var(--tealD); }
+.lam .dest.dest-neg { border-left-color: var(--red); }
+.lam .leg i.tr { background: none; height: 0; border-top: 1.4px dashed; width: 4mm; }
+.lam .recharts-responsive-container { margin-left: 0; }
+.lam-tab.mensal { table-layout: fixed; }
+.lam-tab.mensal col.c-serie { width: 17mm; }
+.lam-tab.mensal col.c-tipo { width: 9mm; }
+.lam-tab.mensal col.c-12m { width: 13mm; }
+.lam-tab.mensal th.tot12, .lam-tab.mensal td.tot12 { background: #F4F5F7; font-weight: 700; border-left: 0.8px solid var(--dark); }
+.lam-tab.mensal tr:not(.ult):not(.cdi) td:not(:first-child) { border-bottom: 0; }
+.lam-tab.mensal tr.ult td { border-bottom: 0.5px solid var(--grid); }
+.lam-tab.mensal td:first-child { font-weight: 700; vertical-align: top; }
+.lam-tab.janelas td { vertical-align: top; }

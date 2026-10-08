@@ -398,15 +398,19 @@ def detalhe_rf(col: str, r) -> str:
         v = g("pdd_over90")
         return "n/d" if v is None or pd.isna(v) else f"PDD cobre {v * 100:.0f}% do vencido > 90 d (Over 90 = {_p(g('over90_carteira'), 2)} da carteira)"
     if col == "rf10_alavancagem":
-        return (f"PL 12m {_p(g('cresc_pl_12m'), 0)} × Jr 12m {_p(g('cresc_jr_12m'), 0)}; "
-                f"subordinação {('+' if (g('var_sub_12m') or 0) >= 0 else '')}{_p(g('var_sub_12m'))} em 12m")
+        def mov(v, sobe, desce):
+            return "n/d" if v is None or pd.isna(v) else f"{sobe if v >= 0 else desce} {_p(abs(v), 0)}"
+        vs = g("var_sub_12m")
+        sub = "" if vs is None or pd.isna(vs) else \
+            f"; subordinação {'subiu' if vs >= 0 else 'caiu'} {abs(vs) * 100:.1f} p.p.".replace(".", ",")
+        return f"PL {mov(g('cresc_pl_12m'), 'cresceu', 'caiu')} e Jr {mov(g('cresc_jr_12m'), 'cresceu', 'reduziu')}{sub}"
     if col == "rf14_jr_negativa":
         n, s = g("meses_jr_negativa_12m"), g("jr_neg_seguidos")
         return f"{0 if n is None or pd.isna(n) else int(n)} mês(es) com Jr negativa em 12m; maior sequência: {0 if s is None or pd.isna(s) else int(s)}"
     if col == "rf16_rj":
         return f"cedidos por empresas em RJ = {_p(g('m13_rj_pl'), 2)} do PL"
     if col == "rf17_spread":
-        return f"excesso de spread observado 12m = {_p(g('m19_excesso_spread'))} a.a. (limiares calibrados para MCMS)"
+        return f"excesso de spread observado em 12 meses = {_p(g('m19_excesso_spread'))} a.a."
     if col == "rf19_recompra_desconto":
         return f"recompra paga a {_p(g('preco_recompra_mes'))} do valor contábil no mês"
     if col == "rf23_fuga_senior":

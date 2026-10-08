@@ -85,7 +85,7 @@ RED_FLAGS = [  # (coluna, nome, regra em português: A = amarelo, V = vermelho)
     ("rf09_pdd_over90", "PDD ÷ Over 90",
      "Amarelo: a PDD cobre menos de 100% do vencido > 90 dias. Vermelho: menos de 70%. "
      "Só avaliada quando o vencido > 90 dias é pelo menos 0,5% da carteira."),
-    ("rf10_alavancagem", "PL crescendo sem a Jr / subordinação caindo",
+    ("rf10_alavancagem", "PL crescendo sem a Jr / subordinação caindo em 12M",
      "Amarelo: em 12 meses o PL cresceu mais que o dobro do crescimento da Jr (e mais de 20%), "
      "ou a subordinação caiu mais de 5 p.p."),
     ("rf14_jr_negativa", "Retorno negativo da Jr",
