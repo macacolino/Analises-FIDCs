@@ -139,3 +139,16 @@
 .lam-tab.mensal tr.ult td { border-bottom: 0.5px solid var(--grid); }
 .lam-tab.mensal td:first-child { font-weight: 700; vertical-align: top; }
 .lam-tab.janelas td { vertical-align: top; }
+
+/* v3: gráficos e legendas */
+.lam-bloco.graf { display: flex; flex-direction: column; }
+.lam-bloco.graf h3 { order: -2; }
+.lam-bloco.graf .leg { order: -1; margin: -0.6mm 0 1.6mm; }
+.lam .leg { flex-wrap: nowrap; gap: 3.2mm; white-space: nowrap; font-size: 6.9px; }
+.lam .leg span { display: inline-flex; align-items: center; }
+.lam .leg i { width: 2.2mm; height: 2.2mm; margin-right: 1mm; flex: none; }
+.lam .leg i.tr { width: 4mm; height: 0; border-top: 1.3px dashed; }
+.lam .recharts-wrapper, .lam .recharts-surface { overflow: visible; }
+.lam-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.lam .nota .pos { vertical-align: -0.5mm; margin-right: .6mm; }
+.lam-bloco.graf .recharts-responsive-container { margin-bottom: -1mm; }

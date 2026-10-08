@@ -32,13 +32,32 @@ const CONSIG: Record<string, string> = {
 }
 const TIPO_COR: Record<string, string> = { senior: C.tealD, mezanino: C.tealL, subordinada: C.dark, cdi: C.mutedL }
 const tick = { fontSize: 8, fill: C.muted, fontFamily: 'Poppins' }
-const MARGEM = { top: 6, right: 6, bottom: 0, left: -8 }
+const MARGEM = { top: 4, right: 4, bottom: 0, left: 0 }
+/** rótulo do eixo Y encostado na margem esquerda do quadro (alinha com o título) */
+const tickY = (f: (v: number) => string) => (pr: any) => (
+  <text x={0} y={pr.y} dy={3} fontSize={8} fill={C.muted} fontFamily="Poppins" textAnchor="start">{f(pr.payload.value)}</text>)
 const p = (v: any) => fmtValue(v, 'pct')
 const p1 = (v: any) => (v == null || !Number.isFinite(v) ? '–' : `${(v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`)
 const cdiMais = (v: any) => (v == null || !Number.isFinite(v) ? '–' : `CDI ${v >= 0 ? '+' : '−'} ${p1(Math.abs(v))}`)
 const pAx = (v: number) => `${(v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`
 const mi = (v: number) => `${(v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`
 const OUTROS = /outros/i
+const ALT = 150   // altura única dos gráficos
+
+/** eixo Y com 3 a 5 marcas redondas (passo 1, 2, 2,5 ou 5 × 10^k), começando em zero */
+function eixo(rows: Row[], keys: string[], empilhado = false) {
+  let max = 0
+  for (const r of rows) {
+    const vs = keys.map((k) => Number(r[k]) || 0)
+    max = Math.max(max, empilhado ? vs.reduce((a, b) => a + Math.max(b, 0), 0) : Math.max(...vs))
+  }
+  if (max <= 0) return {}
+  const bruto = max / 4, ex = Math.pow(10, Math.floor(Math.log10(bruto)))
+  const passo = [1, 2, 2.5, 5, 10].map((m) => m * ex).find((x) => x >= bruto) ?? 10 * ex
+  const n = Math.max(1, Math.ceil(max / passo - 1e-9))
+  const ticks = Array.from({ length: n + 1 }, (_, i) => +(i * passo).toPrecision(10))
+  return { domain: [0, ticks[n]] as [number, number], ticks }
+}
 
 function Pagina({ n, total, dt, nome, children }: { n: number; total: number; dt: string; nome: string; children: React.ReactNode }) {
   return (
@@ -210,13 +229,13 @@ export default function LaminaPdf() {
       <Pagina n={2} total={total} dt={dt} nome={nomeCurto}>
         <h2 className="lam-titulo">Rentabilidade por classe de cota vs. CDI</h2>
         <div className="lam-cols">
-          <Bloco titulo="Retorno acumulado em 24 meses">
+          <Bloco titulo="Retorno acumulado em 24 meses" className="graf">
             {d.acum.length > 1 ? (
               <>
-                <ResponsiveContainer width="100%" height={180}>
+                <ResponsiveContainer width="100%" height={ALT + 70}>
                   <LineChart data={d.acum} margin={MARGEM}>
-                    <XAxis dataKey="dt" tickFormatter={mesAno} tick={tick} tickLine={false} axisLine={{ stroke: C.grid }} minTickGap={28} />
-                    <YAxis tickFormatter={pAx} tick={tick} tickLine={false} axisLine={false} width={42} />
+                    <XAxis dataKey="dt" tickFormatter={mesAno} tick={tick} tickLine={false} axisLine={{ stroke: C.grid }} minTickGap={28} height={18} />
+                    <YAxis tickFormatter={pAx} tick={tickY(pAx)} tickLine={false} axisLine={false} width={34} {...eixo(d.acum, d.tiposAcum)} />
                     {d.tiposAcum.map((t) => <Line key={t} dataKey={t} stroke={TIPO_COR[t]} strokeWidth={t === 'cdi' ? 1.4 : 2}
                       strokeDasharray={t === 'cdi' ? '4 3' : undefined} dot={false} isAnimationActive={false} connectNulls />)}
                   </LineChart>
@@ -267,16 +286,13 @@ export default function LaminaPdf() {
                 <td className="r tot12">{p(d.cdi12)}</td></tr>
             </tbody>
           </table>
-          <div className="nota">"CDI +" = spread sobre o CDI anualizado: ((1 + retorno) / (1 + CDI))^(12/meses) − 1. 12M = acumulado dos 12 meses (só com os 12 meses completos).
-            Rentabilidade informada pelo administrador (Tab. X.3); quando ela não considera a amortização do mês, usamos a variação da cota somada à
-            amortização por cota estimada (Tab. X.4).{d.notaResidual ? ` * ${d.notaResidual}` : ''}</div>
         </Bloco>
         <div className="lam-cols">
-          <Bloco titulo="Patrimônio por classe de cota (R$ mi)">
-            <ResponsiveContainer width="100%" height={165}>
+          <Bloco titulo="Patrimônio por classe de cota (R$ mi)" className="graf">
+            <ResponsiveContainer width="100%" height={ALT}>
               <AreaChart data={d.plTipo} margin={MARGEM}>
-                <XAxis dataKey="dt" tickFormatter={mesAno} tick={tick} tickLine={false} axisLine={{ stroke: C.grid }} minTickGap={28} />
-                <YAxis tickFormatter={mi} tick={tick} tickLine={false} axisLine={false} width={42} />
+                <XAxis dataKey="dt" tickFormatter={mesAno} tick={tick} tickLine={false} axisLine={{ stroke: C.grid }} minTickGap={28} height={18} />
+                <YAxis tickFormatter={mi} tick={tickY(mi)} tickLine={false} axisLine={false} width={34} {...eixo(d.plTipo, ['pl_senior', 'pl_mezanino', 'pl_subordinada'], true)} />
                 <Area dataKey="pl_subordinada" stackId="1" stroke="none" fill={C.dark} fillOpacity={1} isAnimationActive={false} />
                 <Area dataKey="pl_mezanino" stackId="1" stroke="none" fill={C.tealL} fillOpacity={1} isAnimationActive={false} />
                 <Area dataKey="pl_senior" stackId="1" stroke="none" fill={C.tealD} fillOpacity={1} isAnimationActive={false} />
@@ -284,17 +300,17 @@ export default function LaminaPdf() {
             </ResponsiveContainer>
             <Legenda itens={[[C.tealD, 'Sênior'], [C.tealL, 'Mezanino'], [C.dark, 'Subordinada']]} />
           </Bloco>
-          <Bloco titulo="Subordinação vs. mínimo do regulamento">
-            <ResponsiveContainer width="100%" height={165}>
+          <Bloco titulo="Subordinação vs. mínimo do regulamento" className="graf">
+            <ResponsiveContainer width="100%" height={ALT}>
               <LineChart data={d.histo} margin={MARGEM}>
-                <XAxis dataKey="dt" tickFormatter={mesAno} tick={tick} tickLine={false} axisLine={{ stroke: C.grid }} minTickGap={28} />
-                <YAxis tickFormatter={pAx} tick={tick} tickLine={false} axisLine={false} width={42} domain={[0, 'auto']} />
+                <XAxis dataKey="dt" tickFormatter={mesAno} tick={tick} tickLine={false} axisLine={{ stroke: C.grid }} minTickGap={28} height={18} />
+                <YAxis tickFormatter={pAx} tick={tickY(pAx)} tickLine={false} axisLine={false} width={34} {...eixo(d.histo, ['subordinacao', 'setor_subordinacao', 'sub_min'])} />
                 <Line dataKey="subordinacao" stroke={C.tealD} strokeWidth={2} dot={false} isAnimationActive={false} />
                 <Line dataKey="setor_subordinacao" stroke={C.mutedL} strokeWidth={1.4} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
                 {d.subMin != null && <Line dataKey="sub_min" stroke={C.red} strokeWidth={1.2} dot={false} isAnimationActive={false} />}
               </LineChart>
             </ResponsiveContainer>
-            <Legenda itens={[[C.tealD, 'Fundo'], [C.mutedL, 'Mediana da categoria', true],
+            <Legenda itens={[[C.tealD, 'Fundo'], [C.mutedL, 'Mediana categoria', true],
               ...(d.subMin != null ? [[C.red, 'Mínimo do regulamento'] as [string, string]] : [])]} />
           </Bloco>
         </div>
@@ -314,33 +330,31 @@ export default function LaminaPdf() {
               <tr className="tot"><td>Total</td><td /><td className="r">{fmtValue(d.plSeries, 'brl')}</td><td className="r">100,00%</td><td colSpan={4} /></tr>
             </tbody>
           </table>
-          {d.notaResidual && <div className="nota">PL da subordinada recalculado como PL − sênior − mezanino (a soma das séries informadas não fecha com o PL).</div>}
         </Bloco>
         <div className="lam-cols">
-          <Bloco titulo="Inadimplência > 90 dias e PDD">
-            <ResponsiveContainer width="100%" height={160}>
+          <Bloco titulo="Inadimplência > 90 dias e PDD" className="graf">
+            <ResponsiveContainer width="100%" height={ALT}>
               <LineChart data={d.histo} margin={MARGEM}>
-                <XAxis dataKey="dt" tickFormatter={mesAno} tick={tick} tickLine={false} axisLine={{ stroke: C.grid }} minTickGap={28} />
-                <YAxis tickFormatter={pAx} tick={tick} tickLine={false} axisLine={false} width={42} />
+                <XAxis dataKey="dt" tickFormatter={mesAno} tick={tick} tickLine={false} axisLine={{ stroke: C.grid }} minTickGap={28} height={18} />
+                <YAxis tickFormatter={pAx} tick={tickY(pAx)} tickLine={false} axisLine={false} width={34} {...eixo(d.histo, ['inad_90', 'pdd_carteira', 'setor_inad_90', 'setor_pdd_carteira'])} />
                 <Line dataKey="inad_90" stroke={C.red} strokeWidth={2} dot={false} isAnimationActive={false} />
                 <Line dataKey="pdd_carteira" stroke={C.tealD} strokeWidth={2} dot={false} isAnimationActive={false} />
                 <Line dataKey="setor_inad_90" stroke={C.red} strokeOpacity={0.55} strokeWidth={1.3} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
                 <Line dataKey="setor_pdd_carteira" stroke={C.tealD} strokeOpacity={0.55} strokeWidth={1.3} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
-            <Legenda itens={[[C.red, 'Inad. > 90d'], [C.tealD, 'PDD / carteira'], [C.red, 'Inad. > 90d · mediana categoria', true],
-              [C.tealD, 'PDD · mediana categoria', true]]} />
+            <Legenda itens={[[C.red, 'Inad. > 90d'], [C.tealD, 'PDD / carteira'], [C.red, 'Inad. · mediana', true], [C.tealD, 'PDD · mediana', true]]} />
           </Bloco>
-          <Bloco titulo="Carteira por prazo e por atraso (R$ mi)">
-            <ResponsiveContainer width="100%" height={160}>
+          <Bloco titulo="Carteira por prazo e por atraso (R$ mi)" className="graf">
+            <ResponsiveContainer width="100%" height={ALT}>
               <BarChart data={d.aging} margin={MARGEM} barGap={1}>
-                <XAxis dataKey="faixa" tick={{ ...tick, fontSize: 6.8 }} tickLine={false} axisLine={{ stroke: C.grid }} interval={0} />
-                <YAxis tickFormatter={mi} tick={tick} tickLine={false} axisLine={false} width={42} />
+                <XAxis dataKey="faixa" tick={{ ...tick, fontSize: 6.8 }} tickLine={false} axisLine={{ stroke: C.grid }} interval={0} height={18} />
+                <YAxis tickFormatter={mi} tick={tickY(mi)} tickLine={false} axisLine={false} width={34} {...eixo(d.aging, ['a_vencer', 'vencido'])} />
                 <Bar dataKey="a_vencer" fill={C.tealD} isAnimationActive={false} />
                 <Bar dataKey="vencido" fill={C.red} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
-            <Legenda itens={[[C.tealD, 'A vencer: dias até o vencimento'], [C.red, 'Vencido: dias de atraso']]} />
+            <Legenda itens={[[C.tealD, 'A vencer (dias até vencer)'], [C.red, 'Vencido (dias de atraso)']]} />
           </Bloco>
         </div>
         <div className="lam-cols">
@@ -486,8 +500,8 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra) {
   const seriesAtivas = men.series.filter((s) => (ult[`${s.key}_pl`] ?? 0) > 0)
   const residuais = men.meses.filter((m) => m.sub_residual).map((m) => mesAno(m.dt))
   const notaResidual = residuais.length
-    ? `Em ${residuais.slice(0, 4).join(', ')}${residuais.length > 4 ? '…' : ''} a soma das séries informadas não fecha com o PL do fundo. ` +
-      'A subordinada foi recalculada como PL − sênior − mezanino (ela é o resíduo da estrutura); o retorno dela nesses meses é estimativa.'
+    ? `Subordinada recalculada como PL − sênior − mezanino em ${residuais.slice(0, 4).join(', ')}: nesses meses a soma das séries ` +
+      'informadas não fecha com o PL do fundo. Retorno da subordinada nesses meses é estimativa.'
     : null
 
   const plSeries = (lam.series as Row[]).reduce((a, s) => a + (s.tipo === 'subordinada' && (ult.sub_residual) ? 0 : (s.pl_serie ?? 0)), 0)
