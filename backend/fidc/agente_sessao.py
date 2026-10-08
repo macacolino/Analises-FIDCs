@@ -141,18 +141,37 @@ def fila_taxas(limite: int) -> list[tuple[str, str]]:
     return list(zip(u.cnpj, u.nome))
 
 
+# página com VALOR de taxa (percentual ou R$ perto do nome da taxa) vale mais que a lista de encargos que só cita a taxa
+_TAXA_VALOR = re.compile(r"(taxa (maxima )?de (administracao|gestao|performance|custodia)|remuneracao (da|do|a|ao) "
+                         r"(administrador|gestor)a?)[^.;]{0,220}?(\d+[,.]\d+ ?%|\d+ ?% ?\(|r\$ ?\d)")
+_PRAZO = re.compile(r"(resgate[^.;]{0,120}(d\+ ?\d+|\d+ \(?[a-z ]*\)? dias)|nao havera resgate|cotizacao)")
+
+
 def trechos_taxas(paginas: list[str]) -> str:
-    sel = ag._nucleo(paginas, n=6, padroes=ag._TAXAS, seguinte=True)
+    pts = []
+    for i, pg in enumerate(paginas):
+        if re.search(r"\.{8,}", pg):
+            continue
+        t = rg._norm(re.sub(r"\s+", " ", pg))
+        s = 10 * len(_TAXA_VALOR.findall(t)) + 3 * bool(_PRAZO.search(t)) + sum(bool(re.search(q, t)) for q in ag._TAXAS)
+        if s:
+            pts.append((s, -i, i))
+    sel: set[int] = set()
+    total = 0
+    for _, _, i in sorted(pts, reverse=True):
+        for j in (i, i + 1):        # a tabela/cláusula costuma continuar na página seguinte
+            if j in sel or j >= len(paginas):
+                continue
+            n = len(re.sub(r"\s+", " ", paginas[j]))
+            if total + n > LIMITE_TAXAS and sel:
+                break
+            sel.add(j)
+            total += n
+        if total >= LIMITE_TAXAS:
+            break
     if not sel:
         return ag.trechos(paginas, LIMITE_TAXAS)
-    out, total = [], 0
-    for i in sorted(sel):
-        t = re.sub(r"\s+", " ", paginas[i]).strip()
-        if total + len(t) > LIMITE_TAXAS and out:
-            break
-        out.append(f"[p. {i + 1}] {t}")
-        total += len(t)
-    return "\n\n".join(out)
+    return "\n\n".join(f"[p. {i + 1}] " + re.sub(r"\s+", " ", paginas[i]).strip() for i in sorted(sel))
 
 
 def fila(limite: int) -> list[tuple[str, str]]:
