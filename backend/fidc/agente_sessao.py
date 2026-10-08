@@ -124,21 +124,50 @@ trabalham em paralelo na mesma pasta.
 """
 
 
-def fila_taxas(limite: int) -> list[tuple[str, str]]:
-    """Fundos ativos já lidos pela IA, sem taxa de administração nem de gestão e ainda não passados nesta etapa."""
+def fila_taxas(limite: int, todos: bool = False) -> list[tuple[str, str]]:
+    """Fundos ativos já lidos pela IA, sem taxa de administração nem de gestão. Fora: os já passados nesta etapa
+    (salvo se depois apareceu documento com taxa) e os sem nenhum documento com taxa no FNET (`todos` ignora ambos)."""
     from .db import df
-    con = ag.db()
-    feitos = {c for c, r in con.execute("SELECT cnpj, resultado FROM reg_ia") if "taxas_releitura" not in json.loads(r)}
+    from . import taxas_docs as td
+    con = td.db()
+    passados = {c: json.loads(r)["taxas_releitura"].get("data", "") for c, r in con.execute("SELECT cnpj, resultado FROM reg_ia")
+                if "taxas_releitura" in json.loads(r)}
+    lidos = {c for (c,) in con.execute("SELECT cnpj FROM reg_ia")}
+    docs = {c: (st, em or "") for c, st, em in con.execute("SELECT cnpj, status, processado_em FROM reg_taxa_doc")}
     con.close()
     u = df("""SELECT cnpj, nome, categoria, pl FROM fundo
               WHERE ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH
                 AND cnpj NOT IN (SELECT cnpj FROM regulamento_param
                                  WHERE campo IN ('taxa_administracao', 'taxa_gestao'))""")
-    u = u[u.cnpj.isin(feitos)].copy()
+    u = u[u.cnpj.isin(lidos)].copy()
+    if not todos:
+        def pendente(c):
+            st, em = docs.get(c, (None, ""))
+            if st == "nao_encontrado":
+                return False
+            return c not in passados or (st is not None and em[:10] > passados[c])
+        u = u[u.cnpj.map(pendente)]
     prio = {"precatorios_federais": 0, "precatorios": 0, "judicial": 1, "setor_publico_outros": 1}
     u["k"] = u.categoria.map(prio).fillna(2)
     u = u.sort_values(["k", "pl"], ascending=[True, False]).head(limite)
     return list(zip(u.cnpj, u.nome))
+
+
+def texto_taxas(cnpj: str) -> str | None:
+    """Páginas com taxa (regulamento atual ou outro documento do FNET achado por taxas_docs), com a origem."""
+    from . import taxas_docs as td
+    t = td.carregar(cnpj)
+    if not t:
+        return None
+    pags = sorted(t["paginas"].items(), key=lambda kv: int(kv[0]))
+    out, total = [], 0
+    for n, pg in pags:
+        x = re.sub(r"\s+", " ", pg).strip()
+        if total + len(x) > LIMITE_TAXAS and out:
+            break
+        out.append(f"[p. {n}] {x}")
+        total += len(x)
+    return f"Documento: {t.get('categoria') or 'Regulamento'} entregue em {t.get('data_entrega') or '?'}\n\n" + "\n\n".join(out)
 
 
 # página com VALOR de taxa (percentual ou R$ perto do nome da taxa) vale mais que a lista de encargos que só cita a taxa
@@ -233,13 +262,24 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
         itens = [(c, nomes.get(c, "")) for c in cnpjs]
     else:
         itens = fila_taxas(limite) if taxas else fila(limite)
+    if taxas:   # garante que cada fundo já passou pela busca do documento com taxa no FNET
+        from . import taxas_docs as td
+        con = td.db()
+        feitos = {c for (c,) in con.execute("SELECT cnpj FROM reg_taxa_doc")}
+        con.close()
+        falta = [c for c, _ in itens if c not in feitos]
+        if falta:
+            print(json.dumps({"busca_documentos": td.rodar(falta)}))
     ok = []
     for cnpj, nome in itens:
         p = ag._texto(cnpj)
         if not p:
             continue
         if taxas:
-            t, rot = trechos_taxas(p), "Trechos do regulamento (taxas e quadro-resumo)"
+            t = texto_taxas(cnpj)
+            if not t:
+                continue
+            rot = "Trechos com taxas"
         elif completo:
             t, rot = _completo(p), "Regulamento inteiro"
         else:

@@ -148,8 +148,8 @@ export default function LaminaPdf() {
           <Kpi v={p(k.inad_90)} label="Inadimplência > 90 dias" hint={d.med.inad_90 != null ? <>mediana da categoria {p(d.med.inad_90)}</> : undefined} />
           <Kpi v={p(k.pdd_carteira)} label="PDD / carteira" hint={d.med.pdd_carteira != null ? <>mediana da categoria {p(d.med.pdd_carteira)}</> : undefined} />
           <Kpi v={fmtValue(k.cobertura_pdd_90, 'x')} label="PDD / vencido > 90 dias" hint={d.med.cobertura_pdd_90 != null ? <>mediana da categoria {fmtValue(d.med.cobertura_pdd_90, 'x')}</> : undefined} />
-          <Kpi v={d.senior12 ? cdiMais(d.senior12.spread_aa_12m) : '–'} label={`Sênior · retorno 12 meses`}
-            hint={d.senior12 ? <>{p(d.senior12.cota_12m)} em 12m · {p1(d.senior12.pct_cdi_12m)} do CDI ({d.senior12.rotulo})</> : 'série sem 12 meses de histórico'} />
+          <Kpi v={d.senior12 ? p1(d.senior12.cota_12m) : '–'} label="Sênior · retorno 12 meses"
+            hint={d.senior12 ? <>{cdiMais(d.senior12.spread_aa_12m)} a.a. · {p1(d.senior12.pct_cdi_12m)} do CDI</> : 'série sem 12 meses de histórico'} />
           <Kpi v={d.sub12 ? `${p1(d.sub12.cota_12m)}${nota12}` : '–'} label="Subordinada · retorno 12 meses"
             hint={d.sub12 ? <>{cdiMais(d.sub12.spread_aa_12m)} a.a. · {p1(d.sub12.pct_cdi_12m)} do CDI</> : 'série sem 12 meses de histórico'}
             alerta={d.sub12 && d.sub12.cota_12m < 0} />
@@ -189,8 +189,8 @@ export default function LaminaPdf() {
             </Bloco>
             <Bloco titulo="Posição vs. pares">
               <p className="resumo">{d.paresResumo.frase}</p>
-              {d.paresResumo.pos && <p className="dest dest-pos"><b>Destaque positivo:</b> {d.paresResumo.pos}</p>}
-              {d.paresResumo.neg && <p className="dest dest-neg"><b>Destaque negativo:</b> {d.paresResumo.neg}</p>}
+              {d.paresResumo.pos && <p className="dest dest-pos"><b>Pontos fortes:</b> {d.paresResumo.pos}</p>}
+              {d.paresResumo.neg && <p className="dest dest-neg"><b>Pontos de atenção:</b> {d.paresResumo.neg}</p>}
             </Bloco>
             <Bloco titulo="Red flags">
               {d.rfAlerta.length === 0 && <p className="ok">Nenhuma red flag em amarelo ou vermelho na data-base.</p>}
@@ -226,16 +226,20 @@ export default function LaminaPdf() {
             ) : <p className="nota">Histórico insuficiente.</p>}
           </Bloco>
           <Bloco titulo="Rentabilidade acumulada por série">
-            <table className="lam-tab janelas">
-              <thead><tr><th>Série</th><th className="r">3 meses</th><th className="r">6 meses</th><th className="r">12 meses</th><th className="r">Desde o início</th></tr></thead>
+            <table className="lam-tab janelas mensal">
+              <colgroup><col className="c-serie" /><col className="c-tipo" /><col /><col /><col /><col /></colgroup>
+              <thead><tr><th>Série</th><th /><th className="r">3 meses</th><th className="r">6 meses</th><th className="r">12 meses</th><th className="r">Início</th></tr></thead>
               <tbody>{d.janelas.map((j) => (
-                <tr key={j.serie} title={j.serie}><td>{j.rotulo}{j.meses_residual ? '*' : ''}</td>
-                  {['3m', '6m', '12m', 'inicio'].map((x) => (
-                    <td key={x} className="r">{p(j[`cota_${x}`])}
-                      <span className="sub">{j[`spread_aa_${x}`] != null ? cdiMais(j[`spread_aa_${x}`]) : ''}</span></td>))}
-                </tr>))}</tbody>
+                <Fragment key={j.serie}>
+                  <tr className="cota"><td rowSpan={3}>{j.rotulo}{j.meses_residual ? '*' : ''}</td><td className="muted">cota</td>
+                    {['3m', '6m', '12m', 'inicio'].map((x) => <td key={x} className="r">{p(j[`cota_${x}`])}</td>)}</tr>
+                  <tr><td className="muted">% CDI</td>
+                    {['3m', '6m', '12m', 'inicio'].map((x) => <td key={x} className="r muted">{p1(j[`pct_cdi_${x}`])}</td>)}</tr>
+                  <tr className="ult"><td className="muted">CDI +</td>
+                    {['3m', '6m', '12m', 'inicio'].map((x) => <td key={x} className="r muted">{p1(j[`spread_aa_${x}`])}</td>)}</tr>
+                </Fragment>))}</tbody>
             </table>
-            <div className="nota">Abaixo de cada retorno, o equivalente em CDI + % ao ano. Início = 1º mês da série no informe.</div>
+            <div className="nota">CDI + = spread anualizado sobre o CDI. Início = 1º mês da série no informe.</div>
           </Bloco>
         </div>
         <Bloco titulo="Retorno mensal vs. CDI · últimos 12 meses">
@@ -397,20 +401,19 @@ function limparLastro(t: string) {
     .replace(/\s+([;.,])/g, '$1').replace(/,\s*;/g, ';').trim()
 }
 
-function resumoPares(comp: any) {
-  const ms = (comp.metricas as Row[]).filter((m) => m.valor != null && m.mediana != null && m.posicao)
+/** resumo do quadro de pares (mesmos indicadores e marcações verde/vermelho da página 3) */
+function resumoPares(ms: Row[], nPares?: number) {
   const fav = ms.filter((m) => m.posicao === 'favoravel'), desf = ms.filter((m) => m.posicao === 'desfavoravel')
-  const neu = ms.length - fav.length - desf.length
-  const bom = (m: Row) => (m.sentido === -1 ? 1 - m.percentil : m.percentil)
-  const perfil = desf.length >= fav.length + 3 ? 'pior que os pares' : fav.length >= desf.length + 3 ? 'melhor que os pares' : 'em linha com os pares'
-  const desc = (m: Row) => `${m.label} de ${fmtValue(m.valor, m.fmt)} vs. ${fmtValue(m.mediana, m.fmt)} da mediana`
-  const top = [...fav].sort((a, b) => bom(b) - bom(a))[0]
-  const pior = [...desf].sort((a, b) => bom(a) - bom(b))[0]
+  const saldo = fav.length - desf.length
+  const perfil = saldo >= 3 ? 'melhor que a categoria' : saldo <= -3 ? 'pior que a categoria' : 'em linha com a categoria'
+  const desc = (m: Row) => `${m.label}: ${fmtValue(m.valor, m.fmt)} (mediana ${fmtValue(m.mediana, m.fmt)})`
+  const n = (x: number, um: string, varios: string) => `${x} ${x === 1 ? um : varios}`
   return {
-    frase: `Fundo ${perfil}: em ${ms.length} indicadores comparados com ${comp.pares?.n ?? 'os'} fundos da categoria, ` +
-      `${fav.length} favoráveis, ${neu} neutros e ${desf.length} desfavoráveis.`,
-    pos: top ? desc(top) + '.' : null,
-    neg: pior ? desc(pior) + '.' : null,
+    frase: `Perfil ${perfil}. Nos ${ms.length} indicadores do quadro de pares (página 3), comparado a ${nPares ?? 'outros'} ` +
+      `fundos da categoria, o fundo está entre os 25% melhores em ${n(fav.length, 'indicador', 'indicadores')} e entre os ` +
+      `25% piores em ${n(desf.length, 'indicador', 'indicadores')}; nos demais, fica perto da mediana.`,
+    pos: fav.length ? fav.map(desc).join('; ') + '.' : null,
+    neg: desf.length ? desf.map(desc).join('; ') + '.' : null,
   }
 }
 
@@ -525,7 +528,7 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra) {
   return {
     h, k, dt, par, parLinhas, plVar12, med, histo, plTipo, subMin, acum, tiposAcum, rotAcum, janelas, porSerie, senior12, sub12,
     ult12, cdi12, seriesAtivas, notaResidual, estrutura, plSeries, rfAlerta, pares, paresDesc: comp.pares?.descricao ?? 'categoria',
-    paresResumo: resumoPares(comp), cedentes: (lam.cedentes as Row[]).slice(0, 6), alertas,
+    paresResumo: resumoPares(pares, comp.pares?.n), cedentes: (lam.cedentes as Row[]).slice(0, 6), alertas,
     aging: (lam.aging as Row[]).map((a) => ({ ...a, faixa: String(a.faixa).replace('>1080', '> 1080') })),
     ia, lastro: ia ? limparLastro(ia.lastro) : '', teseTitulo, segs, ficha,
     regData: ext.regulamento?.data_entrega ? String(ext.regulamento.data_entrega).slice(0, 10) : null,

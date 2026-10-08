@@ -10,7 +10,7 @@ valores diferentes por cota, o ajuste é aproximado. Regra de uso:
 - informada e ajustada próximas (até 0,3 p.p.) ou sem amortização no mês: vale a informada;
 - houve amortização e a informada é a variação crua da cota: vale a ajustada (marcada como estimativa).
 
-Subordinada como resíduo: quando a soma das séries difere do PL do fundo (Tab. IV) em mais de 1% e há uma única série
+Subordinada como resíduo: quando a soma das séries difere do PL do fundo (Tab. IV) em mais de 2% e há uma única série
 subordinada, o PL da subordinada é recalculado como PL − sênior − mezanino (a júnior é, por definição, o resíduo) e a
 rentabilidade dela no mês = (PL residual + amortizações − captações da subordinada) / PL residual do mês anterior − 1.
 Ex.: F3 Falcon ago/26 - séries somam 7,6% abaixo do PL e a subordinada informada cai 29,9%.
@@ -79,14 +79,14 @@ def rentab_series(cnpj: str, meses: int = 60) -> pd.DataFrame:
 def _subordinada_residual(cnpj: str, s: pd.DataFrame) -> pd.DataFrame:
     """Recalcula a rentabilidade da subordinada pelo resíduo do PL quando a soma das séries não fecha com o PL."""
     s["sub_residual"] = False
-    m = df("""SELECT m.dt, m.pl, coalesce(m.pl_senior, 0) + coalesce(m.pl_mezanino, 0) AS sr_mz, m.sub_residual,
+    m = df("""SELECT m.dt, m.pl, m.pl_subordinada, m.sub_residual,
                      coalesce(f.captacoes, 0) AS cap, coalesce(f.amortizacoes, 0) + coalesce(f.resgates, 0) AS saida
               FROM metricas_mes m LEFT JOIN fluxo_mes f ON f.cnpj = m.cnpj AND f.dt = m.dt AND f.tipo = 'subordinada'
               WHERE m.cnpj = ? ORDER BY m.dt""", [cnpj])
     if m.empty:
         return s
     m["dt"] = pd.to_datetime(m.dt)
-    m["res"] = m.pl - m.sr_mz
+    m["res"] = m.pl_subordinada            # já é o resíduo nos meses marcados; nos demais, a série informada
     m["erro"] = m.sub_residual.fillna(False).astype(bool)   # soma das séries não fecha com o PL (metricas_mes)
     ant = m.shift(1)
     contig = ant.dt.notna() & (ant.dt + pd.offsets.MonthEnd(1) == m.dt)

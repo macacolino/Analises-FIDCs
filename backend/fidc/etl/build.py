@@ -421,19 +421,19 @@ SELECT
   pdd / nullif(dc_bruto, 0) AS pdd_carteira,
   pdd / nullif(inad_parcelas_90, 0) AS cobertura_pdd_90,
   -- estrutura de capital
-  -- Subordinada como resíduo: se a soma das séries não fecha com o PL (Tab. IV) em mais de 1%, a júnior (residual por
+  -- Subordinada como resíduo: se a soma das séries não fecha com o PL (Tab. IV) em mais de 2% (margem para arredondamento e defasagem), a júnior (residual por
   -- definição) passa a ser PL - sênior - mezanino. Ex.: F3 Falcon ago/26, séries 7,6% abaixo do PL.
   pl_senior, pl_mezanino,
-  CASE WHEN (n_series > 1 AND pl > 0 AND pl_subordinada > 0 AND abs(pl_series / pl - 1) > 0.01 AND pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) > 0) THEN pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) ELSE pl_subordinada END AS pl_subordinada,
-  CASE WHEN (n_series > 1 AND pl > 0 AND pl_subordinada > 0 AND abs(pl_series / pl - 1) > 0.01 AND pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) > 0) THEN pl ELSE pl_series END AS pl_series,
-  coalesce((n_series > 1 AND pl > 0 AND pl_subordinada > 0 AND abs(pl_series / pl - 1) > 0.01 AND pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) > 0), false) AS sub_residual, pl_subordinada AS pl_subordinada_informada,
+  CASE WHEN (n_series > 1 AND pl > 0 AND pl_subordinada > 0 AND abs(pl_series / pl - 1) > 0.02 AND pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) > 0) THEN pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) ELSE pl_subordinada END AS pl_subordinada,
+  CASE WHEN (n_series > 1 AND pl > 0 AND pl_subordinada > 0 AND abs(pl_series / pl - 1) > 0.02 AND pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) > 0) THEN pl ELSE pl_series END AS pl_series,
+  coalesce((n_series > 1 AND pl > 0 AND pl_subordinada > 0 AND abs(pl_series / pl - 1) > 0.02 AND pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) > 0), false) AS sub_residual, pl_subordinada AS pl_subordinada_informada,
   n_series, nr_cotistas,
   -- com uma única série com PL não há subordinação a medir (e há administradores que alternam o rótulo
   -- sênior/subordinada da classe única mês a mês)
-  CASE WHEN n_series > 1 AND (n_series > 1 AND pl > 0 AND pl_subordinada > 0 AND abs(pl_series / pl - 1) > 0.01 AND pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) > 0) THEN (pl - coalesce(pl_senior, 0)) / pl
+  CASE WHEN n_series > 1 AND (n_series > 1 AND pl > 0 AND pl_subordinada > 0 AND abs(pl_series / pl - 1) > 0.02 AND pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) > 0) THEN (pl - coalesce(pl_senior, 0)) / pl
        WHEN n_series > 1 THEN (coalesce(pl_subordinada, 0) + coalesce(pl_mezanino, 0)) / nullif(pl_series, 0) END
     AS subordinacao,
-  CASE WHEN n_series > 1 AND (n_series > 1 AND pl > 0 AND pl_subordinada > 0 AND abs(pl_series / pl - 1) > 0.01 AND pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) > 0) THEN (pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0)) / pl
+  CASE WHEN n_series > 1 AND (n_series > 1 AND pl > 0 AND pl_subordinada > 0 AND abs(pl_series / pl - 1) > 0.02 AND pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0) > 0) THEN (pl - coalesce(pl_senior, 0) - coalesce(pl_mezanino, 0)) / pl
        WHEN n_series > 1 THEN pl_subordinada / nullif(pl_series, 0) END AS subordinacao_junior,
   rentab_senior, rentab_mezanino, rentab_subordinada,
   -- concentração
