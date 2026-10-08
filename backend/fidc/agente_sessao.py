@@ -66,6 +66,10 @@ trabalham em paralelo na mesma pasta.
 """
 
 
+# Caracteres por regulamento na leitura em sessão (auditoria: 30k cobria 52% das páginas com dados, 40k cobre 75%)
+LIMITE_SESSAO = 40000
+
+
 def fila(limite: int) -> list[tuple[str, str]]:
     from .db import df
     con = ag.db()
@@ -130,7 +134,7 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
         if completo:
             t, rot = _completo(p), "Regulamento inteiro"
         else:
-            t, rot = ag.trechos(p, 30000, obrigatorias=ag._paginas_regras(cnpj)), "Trechos do regulamento"
+            t, rot = ag.trechos(p, LIMITE_SESSAO, obrigatorias=ag._paginas_regras(cnpj)), "Trechos do regulamento"
         (base / "in" / f"{cnpj}.txt").write_text(f"Fundo: {nome} (CNPJ {cnpj})\n\n{rot}:\n\n{t}")
         ok.append(cnpj)
     k = max(1, -(-len(ok) // tamanho))
