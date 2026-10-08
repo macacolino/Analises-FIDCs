@@ -142,8 +142,9 @@ def fila_taxas(limite: int) -> list[tuple[str, str]]:
 
 
 # página com VALOR de taxa (percentual ou R$ perto do nome da taxa) vale mais que a lista de encargos que só cita a taxa
-_TAXA_VALOR = re.compile(r"(taxa (maxima )?de (administracao|gestao|performance|custodia)|remuneracao (da|do|a|ao) "
-                         r"(administrador|gestor)a?)[^.;]{0,220}?(\d+[,.]\d+ ?%|\d+ ?% ?\(|r\$ ?\d)")
+_TAXA_VALOR = re.compile(r"(taxa (maxima |minima |global )?de (administracao|gestao)|remuneracao (da|do|a|ao) "
+                         r"(administrador|gestor)a?)[^.;]{0,300}?(\d+[,.]\d+ ?%|\d+ ?% ?\(|r\$ ?\d)")
+_PERF_VALOR = re.compile(r"taxa de performance[^.;]{0,200}?(\d+[,.]?\d* ?%)")
 _PRAZO = re.compile(r"(resgate[^.;]{0,120}(d\+ ?\d+|\d+ \(?[a-z ]*\)? dias)|nao havera resgate|cotizacao)")
 
 
@@ -153,7 +154,7 @@ def trechos_taxas(paginas: list[str]) -> str:
         if re.search(r"\.{8,}", pg):
             continue
         t = rg._norm(re.sub(r"\s+", " ", pg))
-        s = 10 * len(_TAXA_VALOR.findall(t)) + 3 * bool(_PRAZO.search(t)) + sum(bool(re.search(q, t)) for q in ag._TAXAS)
+        s = 10 * len(_TAXA_VALOR.findall(t)) + 3 * bool(_PERF_VALOR.search(t)) + 3 * bool(_PRAZO.search(t)) + sum(bool(re.search(q, t)) for q in ag._TAXAS)
         if s:
             pts.append((s, -i, i))
     sel: set[int] = set()
