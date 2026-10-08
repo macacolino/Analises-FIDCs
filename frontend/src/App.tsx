@@ -1,6 +1,8 @@
-import { NavLink, Route, Routes, useLocation } from 'react-router-dom'
+import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useMeta } from './api'
 import { fmtDate, mesAno } from './fmt'
+import FundPicker from './components/FundPicker'
+import { Icone } from './components/Icones'
 import Comparar from './pages/Comparar'
 import Fundo from './pages/Fundo'
 import Glossario from './pages/Glossario'
@@ -12,34 +14,52 @@ import Oportunidades from './pages/Oportunidades'
 import Pesquisa from './pages/Pesquisa'
 import Setor from './pages/Setor'
 
+function Item({ to, icone, children }: { to: string; icone: keyof typeof Icone; children: React.ReactNode }) {
+  const I = Icone[icone]
+  return <NavLink to={to} end={to === '/'}><I />{children}</NavLink>
+}
+
 export default function App() {
   const meta = useMeta()
   const loc = useLocation()
+  const ir = useNavigate()
   if (loc.pathname.startsWith('/lamina/')) {
     return <Routes><Route path="/lamina/:cnpj" element={<LaminaPdf />} /></Routes>
   }
   return (
-    <>
-      <header className="topbar">
-        <span className="logo">Analisador de FIDCs</span>
+    <div className="app">
+      <aside className="sidebar">
+        <div className="brand">
+          <img src="/ouribank_white.png" alt="Ouribank" />
+          <span>Analisador de FIDCs</span>
+        </div>
         <nav>
-          <NavLink to="/" end>Mercado</NavLink>
-          <NavLink to="/oportunidades">Oportunidades</NavLink>
-          <NavLink to="/setores">Setores</NavLink>
-          <NavLink to="/pesquisa">Pesquisa</NavLink>
-          <NavLink to="/comparar">Comparar</NavLink>
-          <NavLink to="/carteira">Carteira</NavLink>
-          <NavLink to="/watchlist">Watchlist</NavLink>
-          <NavLink to="/qualidade">Qualidade</NavLink>
-          <NavLink to="/glossario">Glossário</NavLink>
+          <div className="grp">Mercado</div>
+          <Item to="/" icone="mercado">Visão geral</Item>
+          <Item to="/oportunidades" icone="oportunidades">Oportunidades</Item>
+          <Item to="/setores" icone="setores">Setores</Item>
+          <div className="grp">Fundos</div>
+          <Item to="/pesquisa" icone="pesquisa">Pesquisa</Item>
+          <Item to="/comparar" icone="comparar">Comparar</Item>
+          <div className="grp">Acompanhamento</div>
+          <Item to="/carteira" icone="carteira">Carteira</Item>
+          <Item to="/watchlist" icone="watchlist">Watchlist</Item>
+          <div className="grp">Referência</div>
+          <Item to="/qualidade" icone="qualidade">Qualidade do dado</Item>
+          <Item to="/glossario" icone="glossario">Glossário</Item>
         </nav>
         {meta.data && (
-          <span className="meta" title={`Último mês com dados parciais: ${mesAno(meta.data.ultimo_mes)}`}>
-            Referência {mesAno(meta.data.mes_referencia)} · base de {fmtDate(meta.data.atualizado_em)}
-          </span>
+          <div className="foot" title={`Último mês com dados parciais: ${mesAno(meta.data.ultimo_mes)}`}>
+            Referência <b>{mesAno(meta.data.mes_referencia)}</b><br />Base atualizada em {fmtDate(meta.data.atualizado_em)}
+          </div>
         )}
-      </header>
-      <main>
+      </aside>
+      <div className="content">
+        <header className="topbar">
+          <div className="busca"><FundPicker onPick={(r) => ir(`/fundo/${r.cnpj}`)} placeholder="Ir para um fundo: nome ou CNPJ…" /></div>
+          {meta.data && <span className="badge pill">{meta.data.fundos_ativos?.toLocaleString('pt-BR')} fundos ativos · ref. {mesAno(meta.data.mes_referencia)}</span>}
+        </header>
+        <main>
         <Routes>
           <Route path="/" element={<Mercado />} />
           <Route path="/oportunidades" element={<Oportunidades />} />
@@ -55,6 +75,7 @@ export default function App() {
           <Route path="*" element={<div className="card">Página não encontrada.</div>} />
         </Routes>
       </main>
-    </>
+      </div>
+    </div>
   )
 }

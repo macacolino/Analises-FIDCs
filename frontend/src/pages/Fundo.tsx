@@ -29,6 +29,10 @@ export default function Fundo() {
   const { data: dic } = useDic()
   const lam = useApi<Lamina>(`/api/fundos/${cnpj}`)
   const hist = useApi<Row[]>(`/api/fundos/${cnpj}/historico?meses=60`)
+  // rentabilidade do mês por classe já ajustada por amortização / subordinada como resíduo do PL
+  const men = useApi<{ meses: Row[] }>(`/api/fundos/${cnpj}/mensal?meses=3`)
+  const ultMes = men.data?.meses?.[0]
+  const rentAj = (t: string, bruto: any) => (ultMes && ultMes[`t_${t}_rentab`] != null ? ultMes[`t_${t}_rentab`] * 100 : bruto)
   type Tab = 'pares' | 'geral' | 'casa' | 'safra' | 'stress' | 'carteira' | 'series' | 'qualidade' | 'regulamento' | 'roteiro' | 'eventos' | 'notas'
   const [tab, setTab] = useState<Tab>('pares')
   const [peers, setPeers] = useState<PeerOpts>(defaultPeers)
@@ -52,42 +56,38 @@ export default function Fundo() {
 
   return (
     <div className="stack">
-      <div className="card stack" style={{ gap: 10 }}>
-        <div className="row" style={{ alignItems: 'flex-start' }}>
-          <div style={{ flex: 1, minWidth: 280 }}>
+      <div className="card fund-head">
+        <div className="fh-top">
+          <div className="fh-title">
+            <div className="eyebrow">{fmtCnpj(h.cnpj)} · <Link to={`/setores/${h.categoria}`}>{h.categoria_nome}</Link>
+              {' · '}segmento CVM: {SEG[h.segmento_principal] ?? '–'} ({fmtValue(h.segmento_principal_pct, 'pct')})</div>
             <h1>{h.nome}</h1>
-            <div className="sub">
-              {fmtCnpj(h.cnpj)} · <Link to={`/setores/${h.categoria}`}>{h.categoria_nome}</Link>
-              {h.revisar && <span className="badge" style={{ marginLeft: 6 }} title="Classificação automática de baixa confiança">⚠ revisar categoria</span>}
-              {h.ia_diverge_informe && <span className="badge" style={{ marginLeft: 6 }}
+            <div className="row" style={{ gap: 6 }}>
+              <QualidadeBadge status={comp.data?.fundo?.q_status} checks={comp.data?.fundo?.q_checks} />
+              {h.revisar && <span className="badge warn" title="Classificação automática de baixa confiança">⚠ revisar categoria</span>}
+              {h.ia_diverge_informe && <span className="badge warn"
                 title={`O regulamento (leitura por IA) indica tese "${h.ia_tese}", mas só ${fmtValue(h.ia_carteira_compat, 'pct')} da carteira declarada no informe CVM (Tab. II, sem os segmentos "outros") está em segmentos compatíveis. Pode ser leitura errada do regulamento, fundo fora da política ou informe preenchido no segmento errado.`}>
                 ⚠ regulamento x carteira</span>}
-              {' '}<QualidadeBadge status={comp.data?.fundo?.q_status} checks={comp.data?.fundo?.q_checks} />
-              {' '}· segmento CVM: {SEG[h.segmento_principal] ?? '–'} ({fmtValue(h.segmento_principal_pct, 'pct')})
             </div>
           </div>
-          <div className="row" style={{ gap: 8 }}>
-            <button className={listas.includes('carteira') ? 'primary' : ''} onClick={() => toggle('carteira')}>
-              {listas.includes('carteira') ? '✓ Na carteira' : '+ Carteira'}</button>
-            <button className={listas.includes('watchlist') ? 'primary' : ''} onClick={() => toggle('watchlist')}>
-              {listas.includes('watchlist') ? '✓ Na watchlist' : '+ Watchlist'}</button>
-            <Link className="btn" to={`/comparar?cnpj=${cnpj}`}>Comparar</Link>
+          <div className="fh-actions">
             <a className="btn primary" href={`/lamina/${cnpj}?print=1`} target="_blank" rel="noreferrer"
               title="Relatório de 3 páginas A4 para a diretoria; abre em nova aba e chama Salvar como PDF">⬇ Lâmina PDF</a>
             <a className="btn" href={`/api/fundos/${cnpj}/lamina.xlsx`}>⬇ Lâmina Excel</a>
             <a className="btn" href={`/api/fundos/${cnpj}/comite.xlsx`}>⬇ Pacote do comitê</a>
+            <Link className="btn" to={`/comparar?cnpj=${cnpj}`}>Comparar</Link>
+            <button className={listas.includes('carteira') ? 'primary' : ''} onClick={() => toggle('carteira')}>
+              {listas.includes('carteira') ? '✓ Na carteira' : '+ Carteira'}</button>
+            <button className={listas.includes('watchlist') ? 'primary' : ''} onClick={() => toggle('watchlist')}>
+              {listas.includes('watchlist') ? '✓ Na watchlist' : '+ Watchlist'}</button>
           </div>
         </div>
-        <table className="simple" style={{ maxWidth: 1100 }}>
-          <tbody>
-            <tr><th>Gestor</th><td>{h.gestor ?? '–'}</td><th>Administrador</th><td>{h.admin ?? '–'}</td></tr>
-            <tr><th>Custodiante</th><td>{h.custodiante ?? '–'}</td><th>Auditor</th><td>{h.auditor ?? '–'}</td></tr>
-            <tr><th>Condomínio</th><td>{h.condominio ?? '–'}{h.exclusivo === 'S' ? ' · exclusivo' : ''}</td>
-              <th>Situação CVM</th><td>{h.situacao ?? '–'}</td></tr>
-            <tr><th>Início (cadastro)</th><td>{fmtDate(h.data_inicio)}</td>
-              <th>Informes desde</th><td>{mesAno(h.primeiro_informe)} · último {mesAno(h.ultimo_informe)}</td></tr>
-          </tbody>
-        </table>
+        <div className="ficha-grid">
+          {([['Gestor', h.gestor], ['Administrador', h.admin], ['Custodiante', h.custodiante], ['Auditor', h.auditor],
+            ['Condomínio', `${h.condominio ?? '–'}${h.exclusivo === 'S' ? ' · exclusivo' : ''}`], ['Situação CVM', h.situacao],
+            ['Início (cadastro)', fmtDate(h.data_inicio)], ['Informes', `${mesAno(h.primeiro_informe)} a ${mesAno(h.ultimo_informe)}`],
+          ] as [string, any][]).map(([l, v]) => <div key={l}><span>{l}</span><b>{v ?? '–'}</b></div>)}
+        </div>
       </div>
 
       <div className="grid2">
@@ -110,8 +110,8 @@ export default function Fundo() {
         <Kpi k="pdd_carteira" v={k.pdd_carteira} compare={vsSetor('pdd_carteira')} />
         <Kpi k="cobertura_pdd_90" v={k.cobertura_pdd_90} compare={vsSetor('cobertura_pdd_90')} />
         <Kpi k="subordinacao" v={k.subordinacao} compare={vsSetor('subordinacao')} />
-        <Kpi k="rentab_senior" v={k.rentab_senior} compare={vsSetor('rentab_senior')} />
-        <Kpi k="rentab_subordinada" v={k.rentab_subordinada} compare={vsSetor('rentab_subordinada')} />
+        <Kpi k="rentab_senior" v={rentAj('senior', k.rentab_senior)} compare={vsSetor('rentab_senior')} />
+        <Kpi k="rentab_subordinada" v={rentAj('subordinada', k.rentab_subordinada)} compare={vsSetor('rentab_subordinada')} />
         <Kpi k="prazo_medio_dias" v={k.prazo_medio_dias} compare={vsSetor('prazo_medio_dias')} />
         <Kpi k="top1_cedente_pct" v={k.top1_cedente_pct} compare={vsSetor('top1_cedente_pct')} />
         <Kpi k="liquidez_30_pl" v={k.liquidez_30_pl} />

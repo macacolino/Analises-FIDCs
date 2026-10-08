@@ -68,7 +68,7 @@ export default function Oportunidades() {
                   <option value="">+ adicionar categoria</option>
                   {m.data.resumo.filter((r) => !escolhidas.includes(r.categoria)).map((r) => <option key={r.categoria} value={r.categoria}>{r.categoria_nome}</option>)}
                 </select>
-                {escolhidas.map((c) => <button key={c} style={{ padding: '0 6px' }} onClick={() => setSel(escolhidas.filter((x) => x !== c))}>{nome(c)} ×</button>)}
+                {escolhidas.map((c) => <span key={c} className="chip">{nome(c)}<button title="Remover" onClick={() => setSel(escolhidas.filter((x) => x !== c))}>×</button></span>)}
               </div>
               <TimeLines data={porCat} fmt="brl" series={escolhidas.map((c) => ({ key: c, label: nome(c) }))} />
             </div>

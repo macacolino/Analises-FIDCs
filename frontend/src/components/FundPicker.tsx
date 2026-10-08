@@ -14,11 +14,11 @@ export default function FundPicker({ onPick, placeholder = 'Buscar fundo por nom
     <div style={{ position: 'relative', minWidth: 280, flex: 1 }}>
       <input type="search" style={{ width: '100%' }} placeholder={placeholder} value={q} onChange={(e) => setQ(e.target.value)} />
       {res.data && q.length >= 3 && (
-        <div className="card" style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: 40, padding: 4, maxHeight: 320, overflowY: 'auto' }}>
+        <div className="popover">
           {res.data.map((r) => (
             <div key={r.cnpj} className="pick" onClick={() => { onPick(r); setQ(''); setDeb('') }}
-              style={{ padding: '6px 8px', cursor: 'pointer', borderRadius: 6 }}>
-              <div>{r.nome}</div>
+              style={{ padding: '8px 10px', cursor: 'pointer', borderRadius: 8 }}>
+              <div style={{ fontWeight: 500 }}>{r.nome}</div>
               <div className="muted">{r.categoria_nome} · {brl(r.pl)}</div>
             </div>
           ))}

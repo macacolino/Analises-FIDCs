@@ -122,6 +122,12 @@ O regulamento vigente de cada fundo é baixado do FNET (B3) — **gratuito, sem 
 - **Tabelas**: busca geral (sem acento) e filtro sob cada coluna na unidade exibida: `>5`, `<=1,5`, `5-10` (percentuais
   em %, valores em R$ milhões), texto, `a|b` (ou), `-termo` (exclui).
 
+## Design
+Design system em `frontend/src/index.css` (tokens primeiro, componentes só com tokens; modo claro e escuro automáticos):
+identidade Ouribank (navy `#15252D` + teal), Inter no texto e Poppins nos títulos, cantos arredondados (14 px nos cartões,
+10 px nos controles), sombras leves, abas como controle segmentado, menu lateral com ícones e busca global de fundo no topo.
+A tabela (AG Grid) usa os mesmos tokens.
+
 ## Lâmina em PDF e resumo mensal
 - **Lâmina PDF** (botão na página do fundo): 3 páginas A4 na identidade Ouribank para a diretoria — KPIs, características,
   parâmetros do regulamento (manual > IA > regras), tese e lastro, red flags atingidas (vermelho/amarelo, verdes em uma
