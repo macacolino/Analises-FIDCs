@@ -23,6 +23,7 @@ import duckdb
 from .. import config
 from .. import agente_regulamento, regulamentos
 from ..taxonomy import classify
+from .. import pdd
 from . import bcb, casa, cvm_cadastro, cvm_ofertas, qualidade
 
 log = logging.getLogger(__name__)
@@ -606,6 +607,7 @@ def build(db_path: Path | None = None) -> Path:
         SELECT now() AS built_at, (SELECT max(dt) FROM n) AS ultimo_mes,
                (SELECT max(dt) FROM r WHERE ratio >= 0.9) AS ultimo_mes_completo
     """)
+    log.info("pdd por administrador"); pdd.build_table(con)   # usa _meta
     con.close()
     os.replace(tmp, final)
     log.info("base pronta: %s", final)

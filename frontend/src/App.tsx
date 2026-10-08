@@ -11,6 +11,7 @@ import LaminaPdf from './pages/LaminaPdf'
 import Lista from './pages/Lista'
 import Mercado from './pages/Mercado'
 import Oportunidades from './pages/Oportunidades'
+import Pdd from './pages/Pdd'
 import Pesquisa from './pages/Pesquisa'
 import Setor from './pages/Setor'
 
@@ -45,6 +46,7 @@ export default function App() {
           <Item to="/carteira" icone="carteira">Carteira</Item>
           <Item to="/watchlist" icone="watchlist">Watchlist</Item>
           <div className="grp">Referência</div>
+          <Item to="/pdd" icone="pdd">PDD por administrador</Item>
           <Item to="/qualidade" icone="qualidade">Qualidade do dado</Item>
           <Item to="/glossario" icone="glossario">Glossário</Item>
         </nav>
@@ -68,6 +70,7 @@ export default function App() {
           <Route path="/pesquisa" element={<Pesquisa />} />
           <Route path="/comparar" element={<Comparar />} />
           <Route path="/qualidade" element={<Qualidade />} />
+          <Route path="/pdd" element={<Pdd />} />
           <Route path="/glossario" element={<Glossario />} />
           <Route path="/fundo/:cnpj" element={<Fundo />} />
           <Route path="/carteira" element={<Lista tipo="carteira" />} />

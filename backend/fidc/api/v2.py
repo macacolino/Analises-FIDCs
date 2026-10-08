@@ -325,6 +325,32 @@ def lamina_extra(cnpj: str):
     return _clean({"parametros": par, "segmentos": segs, "ia": ia[0] if ia else None, "regulamento": doc[0] if doc else None})
 
 
+@router.get("/pdd/administradores")
+def pdd_administradores(formato: str | None = None):
+    """Régua de PDD praticada por administrador (informe mensal) e, quando lida, a política das demonstrações."""
+    d = df("SELECT * FROM pdd_admin ORDER BY pl DESC")
+    try:
+        pol = df("SELECT * FROM pdd_politica_admin")
+        d = d.merge(pol, on="admin", how="left")
+    except Exception:  # noqa: BLE001 - política ainda não extraída
+        pass
+    return _out(d, formato, "PDD por administrador",
+                "PDD ÷ régua 2.682 = PDD declarada / (1% 1-30d, 3% 31-60, 10% 61-90, 30% 91-120, 50% 121-150, 70% 151-180, "
+                "100% >180 sobre as parcelas vencidas do informe). Curva implícita: % por faixa que melhor explica a PDD "
+                "declarada nos fundos do administrador em 12 meses (estimativa).")
+
+
+@router.get("/pdd/fundos")
+def pdd_fundos(admin: str | None = None, formato: str | None = None):
+    d = df("SELECT * FROM pdd_fundo WHERE (? IS NULL OR admin = ?) ORDER BY pl DESC", [admin, admin])
+    try:
+        pol = df("SELECT cnpj, metodo, faixas_txt, efeito_vagao, provisao_inicial, data_df FROM pdd_politica")
+        d = d.merge(pol, on="cnpj", how="left")
+    except Exception:  # noqa: BLE001
+        pass
+    return _out(d, formato, "PDD por fundo")
+
+
 @router.get("/fundos/{cnpj}/regulamento")
 def regulamento(cnpj: str):
     return _clean(derivados_regulamento(cnpj))
