@@ -16,7 +16,7 @@ const CONCEITOS: [string, string][] = [
   ['Subordinação', '(PL mezanino + PL subordinada) ÷ PL das séries, com PL de cada série = quantidade de cotas × valor da cota (Tab. X.2). Fica em branco quando o fundo tem uma única série.'],
   ['Roll rate', 'Quanto do atraso de uma faixa migra para a faixa seguinte no mês: ex. vencidos 31-60 d no mês ÷ vencidos 1-30 d no mês anterior.'],
   ['Safra (por mês de vencimento)', 'Proxy sem fita: a safra do mês m é o saldo a vencer em até 30 dias no fim de m−1. F30 = vencidos 31-60 d no fim de m+1 ÷ base; F60 = 61-90 d em m+2; F180 = 151-180 d em m+5 (≈ perda da safra); F360 = 361-720 d em m+12.'],
-  ['Pares', 'Fundos usados como comparação: mesma categoria, mercado inteiro ou um grupo salvo (ex.: Pares MCMS). O próprio fundo nunca entra nas estatísticas.'],
+  ['Pares', 'Fundos usados como comparação: mesma categoria ou mercado inteiro. O próprio fundo nunca entra nas estatísticas.'],
   ['P25, mediana, P75', 'Quartis da métrica entre os pares: 25% dos pares estão abaixo do P25, metade abaixo da mediana, 75% abaixo do P75.'],
   ['Percentil', 'Posição do fundo entre os pares (0 a 100), mostrada quando há pelo menos 5 pares com dado.'],
   ['Posição (quartil favorável / desfavorável)', 'Favorável = fundo no melhor quartil dos pares no sentido da métrica (acima do P75 se "maior é melhor"; abaixo do P25 se "menor é melhor"). Desfavorável = pior quartil. Entre os dois = neutro.'],

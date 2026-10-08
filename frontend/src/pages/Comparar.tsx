@@ -19,7 +19,7 @@ export default function Comparar() {
     <div className="stack">
       <div>
         <h1>Comparar</h1>
-        <div className="sub">Fundo contra os pares (categoria, grupo salvo ou mercado) ou vários fundos lado a lado.</div>
+        <div className="sub">Fundo contra os pares (categoria ou mercado) ou vários fundos lado a lado.</div>
       </div>
       <Tabs value={tab} onChange={setTab} options={[['pares', 'Fundo × pares'], ['lado', 'Lado a lado']]} />
       {tab === 'pares' && (

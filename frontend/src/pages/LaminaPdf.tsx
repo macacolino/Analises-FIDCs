@@ -49,8 +49,8 @@ function Pagina({ n, total, dt, nome, children }: { n: number; total: number; dt
       )}
       <div className="lam-body">{children}</div>
       <footer className="lam-foot">
-        <span>Fonte: CVM (informe mensal e cadastro), FNET/B3 (regulamento) e BCB (CDI). Dados declarados pelo
-          administrador, sem auditoria. Uso interno Ouribank.</span>
+        <span>Lâmina construída só com dados públicos: CVM (informe mensal e cadastro), FNET/B3 (regulamento) e BCB (CDI).
+          Pode diferir do material do gestor. Dados declarados pelo administrador, sem auditoria. Uso interno Ouribank.</span>
         <span className="pg">{String(n).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
       </footer>
     </section>
@@ -248,7 +248,7 @@ export default function LaminaPdf() {
             </tbody>
           </table>
           <div className="nota">Rentabilidade informada pelo administrador (Tab. X.3). Quando ela não considera a amortização do mês,
-            usamos a variação da cota somada à amortização por cota estimada (Tab. X.4) — estimativa, pode diferir da lâmina do gestor.</div>
+            usamos a variação da cota somada à amortização por cota estimada (Tab. X.4) — estimativa a partir dos dados públicos; a lâmina do gestor usa a amortização exata de cada série.</div>
         </Bloco>
         <div className="lam-cols">
           <Bloco titulo="Patrimônio por classe de cota (R$ mi)">

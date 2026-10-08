@@ -16,7 +16,6 @@ export function peerQs(p: PeerOpts) {
 }
 
 export function PeerSelector({ value, onChange }: { value: PeerOpts; onChange: (p: PeerOpts) => void }) {
-  const grupos = useApi<Row[]>('/api/grupos', { staleTime: 30_000 })
   return (
     <div className="row" style={{ gap: 10 }}>
       <label className="sub">Comparar com</label>
@@ -27,7 +26,6 @@ export function PeerSelector({ value, onChange }: { value: PeerOpts; onChange: (
         }}>
         <option value="categoria">Fundos da mesma categoria</option>
         <option value="mercado">Mercado inteiro</option>
-        {grupos.data?.map((g) => <option key={g.id} value={`g${g.id}`}>Grupo: {g.nome}</option>)}
       </select>
       <label className="row" style={{ gap: 4 }} title="Fica só o maior fundo de cada gestora nas estatísticas">
         <input type="checkbox" checked={value.uma_por_gestora} onChange={(e) => onChange({ ...value, uma_por_gestora: e.target.checked })} />
