@@ -240,10 +240,10 @@ export default function LaminaPdf() {
               </>
             ) : <p className="nota">Histórico insuficiente.</p>}
           </Bloco>
-          <Bloco titulo="Rentabilidade acumulada por série">
+          <Bloco titulo={d.muitas ? "Rentabilidade acumulada por classe" : "Rentabilidade acumulada por série"}>
             <table className="lam-tab janelas mensal">
               <colgroup><col className="c-serie" /><col className="c-tipo" /><col /><col /><col /><col /></colgroup>
-              <thead><tr><th>Série</th><th /><th className="r">3 meses</th><th className="r">6 meses</th><th className="r">12 meses</th><th className="r">Início</th></tr></thead>
+              <thead><tr><th>{d.muitas ? 'Classe' : 'Série'}</th><th /><th className="r">3 meses</th><th className="r">6 meses</th><th className="r">12 meses</th><th className="r">Início</th></tr></thead>
               <tbody>{d.janelas.map((j) => (
                 <Fragment key={j.serie}>
                   <tr className="cota"><td rowSpan={3}>{j.rotulo}{j.meses_residual ? '*' : ''}</td><td className="muted">cota</td>
@@ -260,7 +260,7 @@ export default function LaminaPdf() {
         <Bloco titulo="Retorno mensal vs. CDI · últimos 12 meses">
           <table className="lam-tab mensal">
             <colgroup><col className="c-serie" /><col className="c-tipo" />{d.ult12.map((m) => <col key={m.dt} />)}<col className="c-12m" /></colgroup>
-            <thead><tr><th>Série</th><th />{d.ult12.map((m) => <th key={m.dt} className="r">{mesAno(m.dt).replace('/20', '/')}</th>)}<th className="r tot12">12M</th></tr></thead>
+            <thead><tr><th>{d.muitas ? 'Classe' : 'Série'}</th><th />{d.ult12.map((m) => <th key={m.dt} className="r">{mesAno(m.dt).replace('/20', '/')}</th>)}<th className="r tot12">12M</th></tr></thead>
             <tbody>
               {d.seriesAtivas.map((s) => {
                 const j = d.porSerie[s.serie]
@@ -317,7 +317,7 @@ export default function LaminaPdf() {
         <h2 className="lam-titulo">Estrutura, carteira e posição vs. pares</h2>
         <Bloco titulo="Estrutura de cotas na data-base">
           <table className="lam-tab">
-            <thead><tr><th>Série</th><th>Tipo</th><th className="r">PL</th><th className="r">% do PL</th><th className="r">Valor da cota</th>
+            <thead><tr><th>{d.muitas ? 'Classe' : 'Série'}</th><th>{d.muitas ? 'Séries' : 'Tipo'}</th><th className="r">PL</th><th className="r">% do PL</th><th className="r">Valor da cota</th>
               <th className="r">Retorno 12m</th><th className="r">CDI + (12m)</th><th className="r">Cotistas</th></tr></thead>
             <tbody>{d.estrutura.map((s) => (
               <tr key={s.serie}><td>{s.rotulo ?? s.serie}</td><td>{s.tipo}</td><td className="r">{fmtValue(s.pl_serie, 'brl')}</td>
@@ -326,6 +326,8 @@ export default function LaminaPdf() {
               <tr className="tot"><td>Total</td><td /><td className="r">{fmtValue(d.plSeries, 'brl')}</td><td className="r">100,00%</td><td colSpan={4} /></tr>
             </tbody>
           </table>
+          {d.muitas && <div className="nota">Fundo com {d.nSeries} séries ativas: estrutura e rentabilidade mostradas por classe de cota
+            (retorno de cada classe = média das séries ponderada pelo PL).</div>}
         </Bloco>
         <div className="lam-cols">
           <Bloco titulo="Inadimplência > 90 dias (Over 90) e PDD" className="graf">
@@ -439,8 +441,11 @@ function resumoPares(ms: Row[], nPares?: number) {
   const n = (x: number, um: string, varios: string) => `${x} ${x === 1 ? um : varios}`
   return {
     frase: `Perfil ${perfil}. Nos ${ms.length} indicadores do quadro de pares (página 3), comparado a ${nPares ?? 'outros'} ` +
-      `fundos da categoria, o fundo está entre os 25% melhores em ${n(fav.length, 'indicador', 'indicadores')} e entre os ` +
-      `25% piores em ${n(desf.length, 'indicador', 'indicadores')}; nos demais, fica perto da mediana.`,
+      'fundos da categoria, ' + (fav.length + desf.length === 0
+        ? 'o fundo fica perto da mediana em todos (nenhum entre os 25% melhores ou piores).'
+        : [fav.length ? `está entre os 25% melhores em ${n(fav.length, 'indicador', 'indicadores')}` : null,
+           desf.length ? `entre os 25% piores em ${n(desf.length, 'indicador', 'indicadores')}` : null].filter(Boolean).join(' e ') +
+          '; nos demais, fica perto da mediana.'),
     pos: fav.length ? fav.map(desc).join('; ') + '.' : null,
     neg: desf.length ? desf.map(desc).join('; ') + '.' : null,
   }
@@ -488,10 +493,13 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra, s
   const fluxo = men.meses.slice(0, 12).reverse().map((m) => ({
     dt: m.dt, captacoes: m.captacoes ?? 0, saidas: (m.amortizacoes ?? 0) + (m.resgates ?? 0) }))
 
-  // rentabilidade: série principal (maior PL) de cada tipo, encadeada
+  // rentabilidade: série principal (maior PL) de cada tipo; com muitas séries (> 6), a classe inteira (ponderada pelo PL)
   const ult = men.meses[0] ?? {}
+  const individuais = men.series.filter((s) => !(s as Row).agregado)
+  const agregadas = men.series.filter((s) => (s as Row).agregado)
+  const muitas = individuais.filter((s) => (ult[`${s.key}_pl`] ?? 0) > 0).length > 6
   const principal: Record<string, { key: string; rotulo: string; serie: string }> = {}
-  for (const s of men.series) {
+  for (const s of (muitas ? agregadas : individuais)) {
     const pl = ult[`${s.key}_pl`] ?? 0
     const atual = principal[s.tipo]
     if (pl > 0 && (!atual || pl > (ult[`${atual.key}_pl`] ?? 0))) principal[s.tipo] = { key: s.key, rotulo: s.rotulo, serie: s.serie }
@@ -513,12 +521,12 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra, s
   })
   const porSerie = Object.fromEntries(men.janelas.map((j) => [j.serie, j]))
   const ativa = (serie: string) => (ult[`${men.series.find((s) => s.serie === serie)?.key}_pl`] ?? 0) > 0
-  const janelas = men.janelas.filter((j) => (j.cota_3m != null || j.cota_inicio != null) && ativa(j.serie))
+  const janelas = men.janelas.filter((j) => (j.cota_3m != null || j.cota_inicio != null) && ativa(j.serie) && !!j.agregado === muitas)
   const senior12 = principal.senior ? porSerie[principal.senior.serie] : null
   const sub12 = principal.subordinada ? porSerie[principal.subordinada.serie] : null
   const ult12 = men.meses.slice(0, 12).reverse()
   const cdi12 = ult12.length === 12 ? ult12.reduce((a, m) => a * (1 + (m.cdi_mes ?? 0)), 1) - 1 : null
-  const seriesAtivas = men.series.filter((s) => (ult[`${s.key}_pl`] ?? 0) > 0)
+  const seriesAtivas = (muitas ? agregadas : individuais).filter((s) => (ult[`${s.key}_pl`] ?? 0) > 0)
   const residuais = men.meses.filter((m) => m.sub_residual).map((m) => mesAno(m.dt))
   const notaResidual = residuais.length
     ? `Subordinada recalculada como PL − sênior − mezanino em ${residuais.slice(0, 4).join(', ')}: nesses meses a soma das séries ` +
@@ -528,14 +536,25 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra, s
   const plSeries = (lam.series as Row[]).reduce((a, s) => a + (s.tipo === 'subordinada' && (ult.sub_residual) ? 0 : (s.pl_serie ?? 0)), 0)
     + (ult.sub_residual ? (ult.pl_subordinada ?? 0) : 0)
   const rotPorSerie = Object.fromEntries(men.series.map((s) => [s.serie, s.rotulo]))
-  const estrutura: Row[] = (lam.series as Row[]).filter((s) => (s.pl_serie ?? 0) > 0).map((s) => {
+  const NOME_TIPO: Record<string, string> = { senior: 'Sênior', mezanino: 'Mezanino', subordinada: 'Subordinada' }
+  const linhas: Row[] = (lam.series as Row[]).filter((s) => (s.pl_serie ?? 0) > 0).map((s) => {
     const pl = s.tipo === 'subordinada' && ult.sub_residual ? ult.pl_subordinada : s.pl_serie
     return {
-      ...s, pl_serie: pl, rotulo: rotPorSerie[s.serie], pct_pl: plSeries ? pl / plSeries : null,
-      tipo: ({ senior: 'Sênior', mezanino: 'Mezanino', subordinada: 'Subordinada' } as Record<string, string>)[s.tipo] ?? s.tipo,
-      r12: porSerie[s.serie]?.cota_12m, s12: porSerie[s.serie]?.spread_aa_12m,
+      ...s, pl_serie: pl, rotulo: rotPorSerie[s.serie], pct_pl: plSeries ? pl / plSeries : null, tipo_id: s.tipo,
+      tipo: NOME_TIPO[s.tipo] ?? s.tipo, r12: porSerie[s.serie]?.cota_12m, s12: porSerie[s.serie]?.spread_aa_12m,
     }
   })
+  // com muitas séries, a estrutura vira uma linha por classe (nº de séries, PL somado, retorno da classe)
+  const estrutura: Row[] = !muitas ? linhas : ['senior', 'mezanino', 'subordinada'].map((t) => {
+    const ls = linhas.filter((l) => l.tipo_id === t)
+    if (!ls.length) return null
+    const ag = agregadas.find((a) => a.tipo === t)
+    const j = ag ? porSerie[ag.serie] : null
+    const pl = ls.reduce((a, l) => a + (l.pl_serie ?? 0), 0)
+    return { serie: t, rotulo: NOME_TIPO[t], tipo: `${ls.length} ${ls.length === 1 ? 'série' : 'séries'}`, pl_serie: pl,
+      pct_pl: plSeries ? pl / plSeries : null, valor_cota: null, r12: j?.cota_12m, s12: j?.spread_aa_12m,
+      nr_cotistas: ls.reduce((a, l) => a + (l.nr_cotistas ?? 0), 0) }
+  }).filter(Boolean) as Row[]
 
   const rfAlerta = (comp.red_flags as Row[]).filter((f) => f.nivel > 0).sort((a, b) => b.nivel - a.nivel)
   const pares = (comp.metricas as Row[]).filter((m) => m.valor != null && m.mediana != null)
@@ -571,7 +590,7 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra, s
 
   return {
     h, k, dt, par, parLinhas, plVar12, med, histo, plTipo, subMin, acum, tiposAcum, rotAcum, janelas, porSerie, senior12, sub12,
-    ult12, cdi12, seriesAtivas, notaResidual, estrutura, plSeries, rfAlerta, pares, fluxo, paresDesc: comp.pares?.descricao ?? 'categoria',
+    ult12, cdi12, seriesAtivas, notaResidual, estrutura, plSeries, rfAlerta, pares, fluxo, muitas, nSeries: linhas.length, paresDesc: comp.pares?.descricao ?? 'categoria',
     paresResumo: resumoPares(pares, comp.pares?.n), cedentes: (lam.cedentes as Row[]).slice(0, 6), alertas,
     aging: (lam.aging as Row[]).map((a) => ({ ...a, faixa: String(a.faixa).replace('>1080', '> 1080') })),
     ia, lastro: ia ? limparLastro(ia.lastro) : '', teseTitulo, segs, ficha,

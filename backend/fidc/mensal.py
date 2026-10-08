@@ -5,8 +5,8 @@ vezes NÃO considera amortizações (a cota cai no mês em que amortiza e a rent
 Recalculamos a variação ajustada por amortização com o que o informe dá:
     amortização por cota (estimada) = amortização do tipo de cota no mês (Tab. X.4) / cotas do tipo no mês
     rentab. ajustada = (valor da cota + amortização por cota) / valor da cota no mês anterior - 1
-A amortização vem por tipo (sênior, mezanino, subordinada), não por série: se as séries do mesmo tipo amortizam
-valores diferentes por cota, o ajuste é aproximado. Regra de uso:
+A amortização vem por tipo (sênior, mezanino, subordinada), não por série: ela é atribuída às séries cuja cota caiu
+em relação às demais do mesmo tipo (ou a todas, se caíram juntas) e dividida pelas cotas delas - aproximação. Regra de uso:
 - informada e ajustada próximas (até 0,3 p.p.) ou sem amortização no mês: vale a informada;
 - houve amortização e a informada é a variação crua da cota: vale a ajustada (marcada como estimativa).
 
@@ -57,9 +57,15 @@ def rentab_series(cnpj: str, meses: int = 60) -> pd.DataFrame:
     prev = s.groupby("serie")[["dt", "valor_cota"]].shift(1)
     contiguo = prev.dt.notna() & (prev.dt + pd.offsets.MonthEnd(1) == s.dt)
     s["valor_cota_ant"] = prev.valor_cota.where(contiguo)
-    qt_tipo = s.groupby(["dt", "tipo"]).qt_cotas.transform("sum")
-    s["amort_por_cota"] = (s.amort_tipo.fillna(0) / qt_tipo).where(qt_tipo > 0, 0.0)
     crua = s.valor_cota / s.valor_cota_ant - 1
+    # a amortização do tipo vai para as séries cuja cota caiu em relação às demais do mesmo tipo (mais de 0,5 p.p.
+    # abaixo da mediana); se nenhuma se destaca, todas amortizaram e ela é dividida pelas cotas do tipo
+    med = crua.groupby([s.dt, s.tipo]).transform("median")
+    caiu = (crua < med - 0.005) & (s.qt_cotas > 0)
+    algum = caiu.groupby([s.dt, s.tipo]).transform("any")
+    elegivel = caiu | ~algum
+    qt_base = s.qt_cotas.where(elegivel, 0).groupby([s.dt, s.tipo]).transform("sum")
+    s["amort_por_cota"] = (s.amort_tipo.fillna(0) / qt_base).where(elegivel & (qt_base > 0), 0.0)
     aj = (s.valor_cota + s.amort_por_cota) / s.valor_cota_ant - 1
     aj = aj.where(aj.abs() < 0.5)
     inf = s.rentab_informada.where(s.rentab_informada.abs() < 0.5)
@@ -147,21 +153,55 @@ def janelas(s: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def por_tipo(s: pd.DataFrame) -> pd.DataFrame:
+    """Uma pseudo-série por classe de cota: rentabilidade do mês ponderada pelo PL do mês anterior de cada série
+    (ou do próprio mês, na falta dele). Usada quando o fundo tem muitas séries."""
+    if s.empty:
+        return s
+    x = s[s.rentab.notna() & s.tipo.isin(list(TIPOS))].copy()
+    x["peso"] = (x.valor_cota_ant * x.qt_cotas).where(x.valor_cota_ant.notna(), x.pl_serie).fillna(0).clip(lower=0)
+    x["rp"] = x.rentab * x.peso
+    g = x.groupby(["dt", "tipo"]).agg(rp=("rp", "sum"), peso=("peso", "sum"), pl_serie=("pl_serie", "sum"),
+                                      cdi_mes=("cdi_mes", "first"), nr_cotistas=("nr_cotistas", "sum"),
+                                      n_series=("serie", "nunique"), sub_residual=("sub_residual", "max")).reset_index()
+    g["rentab"] = (g.rp / g.peso).where(g.peso > 0)
+    g["pct_cdi"] = (g.rentab / g.cdi_mes).where(g.cdi_mes > 0)
+    g["spread_aa"] = ((1 + g.rentab) / (1 + g.cdi_mes)) ** 12 - 1
+    g["serie"] = g.tipo.map(lambda t: f"{TIPOS[t]} (todas as séries)")
+    return g.drop(columns=["rp", "peso"])
+
+
 def tabela(cnpj: str, meses: int = 60) -> dict:
-    """Resumo mensal (linhas = meses, mais recente primeiro) com a rentabilidade de cada série em colunas."""
+    """Resumo mensal (linhas = meses, mais recente primeiro) com a rentabilidade de cada série em colunas e, à parte,
+    de cada classe de cota (todas as séries somadas, ponderadas pelo PL)."""
     r = df(RESUMO_SQL, [cnpj, cnpj, cnpj, meses])
     r["dt"] = pd.to_datetime(r.dt)
     s = rentab_series(cnpj, meses)
+    tipos = por_tipo(s)
     series = _rotulos(s) if not s.empty else []
+    for t in ("senior", "mezanino", "subordinada"):
+        if not tipos.empty and (tipos.tipo == t).any():
+            series.append({"key": f"t_{t}", "serie": f"{TIPOS[t]} (todas as séries)", "tipo": t,
+                           "rotulo": TIPOS[t], "agregado": True})
+    cols = {}
     for d in series:
-        x = s[s.serie == d["serie"]].set_index("dt")
-        r[f"{d['key']}_rentab"] = r.dt.map(x.rentab)
-        r[f"{d['key']}_pct_cdi"] = r.dt.map(x.pct_cdi)
-        r[f"{d['key']}_pl"] = r.dt.map(x.pl_serie)
-        r[f"{d['key']}_spread_aa"] = r.dt.map(x.spread_aa)
+        x = (tipos if d.get("agregado") else s)
+        x = x[x.serie == d["serie"]].set_index("dt")
+        cols[f"{d['key']}_rentab"] = r.dt.map(x.rentab)
+        cols[f"{d['key']}_pct_cdi"] = r.dt.map(x.pct_cdi)
+        cols[f"{d['key']}_pl"] = r.dt.map(x.pl_serie)
+        cols[f"{d['key']}_spread_aa"] = r.dt.map(x.spread_aa)
+    if cols:
+        r = pd.concat([r, pd.DataFrame(cols)], axis=1)
     r = r.sort_values("dt", ascending=False)
     r["dt"] = r.dt.dt.date.astype(str)
-    return {"meses": r, "series": series, "rentab": s, "janelas": janelas(s)}
+    jan = janelas(s)
+    if not tipos.empty:
+        jt = janelas(tipos.assign(sub_residual=tipos.sub_residual.astype(bool)))
+        jt["agregado"] = True
+        jt["rotulo"] = jt.tipo.map(TIPOS)
+        jan = pd.concat([jan.assign(agregado=False), jt], ignore_index=True)
+    return {"meses": r, "series": series, "rentab": s, "janelas": jan}
 
 
 def planilhas(cnpj: str, meses: int = 60) -> dict[str, pd.DataFrame]:
