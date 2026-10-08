@@ -425,7 +425,11 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra) {
     let valor = '–'
     if (x) {
       if (x.valor_num != null) valor = kk === 'prazo_resgate_dias' ? `${x.valor_num} dias` : fmtValue(x.valor_num, x.fmt === 'pct' ? 'pct' : x.fmt)
-      if (x.valor_txt && x.valor_txt.length > 1) valor = x.valor_num != null ? `${valor} · ${x.valor_txt}` : cap(x.valor_txt)
+      const pct = x.valor_num != null ? fmtValue(x.valor_num, 'pct').replace(/,?0+%$/, '').replace(/,$/, '') : ''
+      if (x.valor_txt && x.valor_txt.length > 1) {
+        // o texto lido já costuma trazer o número ("0,18% a.a. sobre o PL..."): não repete
+        valor = x.valor_num != null && !x.valor_txt.includes(pct) ? `${valor} · ${x.valor_txt}` : cap(x.valor_txt)
+      }
       else if (x.valor_txt === 'S') valor = 'Sim'
       else if (x.valor_txt === 'N') valor = kk === 'responsabilidade_limitada' ? 'Não' : 'Não há'
     }
