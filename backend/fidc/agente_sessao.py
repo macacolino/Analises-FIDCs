@@ -69,7 +69,11 @@ trabalham em paralelo na mesma pasta.
 def fila(limite: int) -> list[tuple[str, str]]:
     from .db import df
     con = ag.db()
-    lidos = {c: json.loads(r) for c, r in con.execute("SELECT cnpj, resultado FROM reg_ia")}
+    lidos, antigos = {}, set()
+    for c, r, em in con.execute("SELECT cnpj, resultado, processado_em FROM reg_ia"):
+        lidos[c] = json.loads(r)
+        if lidos[c].get("confianca") == "baixa" and (em or "") < ag.TRECHOS_NUCLEO_DESDE:
+            antigos.add(c)          # lido sem o núcleo da política de investimento: reler
     ok = {c for (c,) in con.execute("SELECT cnpj FROM reg_doc WHERE status = 'ok'")}
     con.close()
     u = df("""SELECT cnpj, nome, categoria, pl FROM fundo
@@ -79,7 +83,8 @@ def fila(limite: int) -> list[tuple[str, str]]:
     u = u[u.cnpj.isin(ok)].copy()
     prec = u.categoria.isin(["precatorios_federais", "precatorios", "judicial", "setor_publico_outros"])
     # pendente: nunca lido por IA, ou precatório lido antes dos campos de taxas/foco
-    u["pend"] = ~u.cnpj.isin(lidos) | (prec & u.cnpj.map(lambda c: "foco_precatorio" not in lidos.get(c, {"x": 1})))
+    u["pend"] = ~u.cnpj.isin(lidos) | u.cnpj.isin(antigos) | (
+        prec & u.cnpj.map(lambda c: "foco_precatorio" not in lidos.get(c, {"x": 1})))
     u = u[u.pend]
     u["k"] = u.categoria.map(prio).fillna(9)
     u = u.sort_values(["k", "pl"], ascending=[True, False]).head(limite)

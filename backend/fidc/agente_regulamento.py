@@ -140,15 +140,46 @@ _TERMOS = {
 }
 
 
+# Núcleo da política de investimento (o que a classe compra): sem isso a tese sai com confiança baixa.
+_NUCLEO = [
+    r"direitos creditorios (a serem adquiridos|que poderao ser adquiridos|elegiveis)( pela classe| pelo fundo)?,? "
+    r"(serao|compreendem|consistem|sao|correspondem)",
+    r"suplemento [a-z0-9]{0,2} ?[-–]? ?(processo de originacao|descricao dos direitos|caracteristicas dos direitos)",
+    r"(tera|tem) (como|por) objetivo proporcionar|o objetivo da classe (e|consiste)|o objetivo do fundo (e|consiste)",
+    r"politica de investimentos?,? (enquadramento|composicao)|a classe alocara seus recursos",
+    r"alocacao minima",
+]
+# Leituras com confiança baixa feitas antes desta data usaram trechos sem o núcleo da política: reler.
+TRECHOS_NUCLEO_DESDE = "2026-10-08T07"
+
+
+def _nucleo(paginas: list[str], n: int = 3) -> set[int]:
+    """Índices (0-based) das páginas da política de investimento + a página seguinte (a cláusula costuma continuar)."""
+    pts = []
+    for i, p in enumerate(paginas):
+        if re.search(r"\.{8,}", p):          # sumário
+            continue
+        t = rg._norm(p)
+        s = sum(bool(re.search(q, t)) for q in _NUCLEO)
+        if s:
+            pts.append((s, -i, i))
+    top = [i for _, _, i in sorted(pts, reverse=True)[:n]]
+    return {j for i in top for j in (i, i + 1) if j < len(paginas)}
+
+
 def trechos(paginas: list[str], limite: int = LIMITE_TRECHOS, obrigatorias: set[int] | None = None) -> str:
     """Páginas mais relevantes (por termos-chave), na ordem original, até `limite` caracteres.
-    `obrigatorias` (1-based): páginas onde a leitura por regras achou parâmetros - vão primeiro."""
+    Primeiro o núcleo da política de investimento; depois `obrigatorias` (1-based: páginas onde a leitura por
+    regras achou parâmetros); depois o restante por pontuação."""
     pts = []
+    nucleo = _nucleo(paginas)
     for i, p in enumerate(paginas):
         n = rg._norm(p)
         s = sum(w * min(len(re.findall(pat, n)), 5) for pat, w in _TERMOS.items())
         if obrigatorias and (i + 1) in obrigatorias:
             s += 1000
+        if i in nucleo:
+            s += 2000
         pts.append((s, i))
     escolhidas, total = set(), 0
     for s, i in sorted(pts, reverse=True):
