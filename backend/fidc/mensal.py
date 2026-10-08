@@ -10,7 +10,8 @@ em relação às demais do mesmo tipo (ou a todas, se caíram juntas) e dividida
 - informada e ajustada próximas (até 0,3 p.p.) ou sem amortização no mês: vale a informada;
 - houve amortização e a informada é a variação crua da cota: vale a ajustada (marcada como estimativa).
 
-Subordinada como resíduo: quando a soma das séries difere do PL do fundo (Tab. IV) em mais de 2% e há uma única série
+Subordinada como resíduo: quando a soma das séries difere do PL do fundo (Tab. IV) em mais de 2%, a subordinada informada
+variou mais de 10% no mês (implausível) e há uma única série
 subordinada, o PL da subordinada é recalculado como PL − sênior − mezanino (a júnior é, por definição, o resíduo) e a
 rentabilidade dela no mês = (PL residual + amortizações − captações da subordinada) / PL residual do mês anterior − 1.
 Ex.: F3 Falcon ago/26 - séries somam 7,6% abaixo do PL e a subordinada informada cai 29,9%.
