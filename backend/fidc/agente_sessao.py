@@ -29,8 +29,11 @@ if set(r) != set(sch["required"]):
 for k, p in props.items():
     if "enum" in p and r.get(k) not in p["enum"]:
         erros.append(f"{k} fora do enum: {r.get(k)}")
-ok = props["campos"]["items"]["properties"]["campo"]["enum"]
-for c in r.get("campos", []):
+ok = props.get("campos", {}).get("items", {}).get("properties", {}).get("campo", {}).get("enum", [])
+for f in r.get("faixas") or []:
+    if set(f) != {"de_dias", "ate_dias", "pct"}: erros.append(f"faixa com chaves erradas: {f}"); continue
+    if not isinstance(f["pct"], (int, float)) or not 0 <= f["pct"] <= 1: erros.append(f"faixa: pct como fração 0-1, veio {f['pct']}")
+for c in (r.get("campos", []) if "campos" in props else []):
     if set(c) != {"campo", "valor", "valor_txt", "pagina", "trecho"}:
         erros.append(f"campo com chaves erradas: {c}"); continue
     if c["campo"] not in ok: erros.append(f"campo inválido: {c['campo']}")
@@ -250,9 +253,11 @@ def _completo(paginas: list[str]) -> str:
 
 
 def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = None, completo: bool = False,
-             taxas: bool = False) -> int:
+             taxas: bool = False, pdd: bool = False) -> int:
     """Monta o lote. `cnpjs` força a lista (auditoria); `completo` manda o regulamento inteiro em vez de trechos;
-    `taxas` faz a passada só de taxas (fila própria, trechos curtos, schema reduzido)."""
+    `taxas` faz a passada só de taxas (fila própria, trechos curtos, schema reduzido); `pdd` lê a nota de PDD das
+    demonstrações financeiras (pdd_docs)."""
+    from . import pdd_docs as pd_
     base = Path(d)
     (base / "in").mkdir(parents=True, exist_ok=True)
     (base / "out").mkdir(exist_ok=True)
@@ -261,7 +266,14 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
         nomes = dict(df("SELECT cnpj, nome FROM fundo").values)
         itens = [(c, nomes.get(c, "")) for c in cnpjs]
     else:
-        itens = fila_taxas(limite) if taxas else fila(limite)
+        itens = pd_.fila(limite) if pdd else fila_taxas(limite) if taxas else fila(limite)
+    if pdd:     # baixa as demonstrações financeiras que ainda não foram buscadas
+        con = pd_.db()
+        feitos = {c for (c,) in con.execute("SELECT cnpj FROM reg_pdd_doc")}
+        con.close()
+        falta = [c for c, _ in itens if c not in feitos]
+        if falta:
+            print(json.dumps({"busca_demonstracoes": pd_.rodar(falta)}))
     if taxas:   # garante que cada fundo já passou pela busca do documento com taxa no FNET
         from . import taxas_docs as td
         con = td.db()
@@ -272,6 +284,12 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
             print(json.dumps({"busca_documentos": td.rodar(falta)}))
     ok = []
     for cnpj, nome in itens:
+        if pdd:
+            t = pd_.texto(cnpj)
+            if t:
+                (base / "in" / f"{cnpj}.txt").write_text(f"Fundo: {nome} (CNPJ {cnpj})\n\n{t}")
+                ok.append(cnpj)
+            continue
         p = ag._texto(cnpj)
         if not p:
             continue
@@ -291,11 +309,12 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
         os.remove(f)
     for i in range(k):
         (base / f"lista_{i:02d}.txt").write_text("\n".join(ok[i::k]))
-    spec = {"instrucoes": INSTRUCOES_TAXAS, "schema": SCHEMA_TAXAS, "modo": "taxas"} if taxas else \
+    spec = {"instrucoes": pd_.INSTRUCOES, "schema": pd_.SCHEMA, "modo": "pdd"} if pdd else \
+        {"instrucoes": INSTRUCOES_TAXAS, "schema": SCHEMA_TAXAS, "modo": "taxas"} if taxas else \
         {"instrucoes": ag.INSTRUCOES, "schema": ag.SCHEMA}
     (base / "spec.json").write_text(json.dumps(spec, ensure_ascii=False))
     (base / "gravar.py").write_text(GRAVAR)
-    prompt = PROMPT_TAXAS if taxas else PROMPT
+    prompt = pd_.PROMPT if pdd else PROMPT_TAXAS if taxas else PROMPT
     (base / "PROMPT.md").write_text(prompt.format(dir=str(base.resolve())) + (COMPLETO if completo else ""))
     print(json.dumps({"fundos": len(ok), "partes": k if ok else 0, "dir": str(base.resolve())}))
     return k if ok else 0
@@ -326,6 +345,9 @@ def importar(d: str) -> dict:
     arq = base / "validos.jsonl"
     arq.write_text("".join(linhas), encoding="utf-8")
     spec = json.loads((base / "spec.json").read_text())
+    if spec.get("modo") == "pdd":
+        from . import pdd_docs
+        return {**pdd_docs.importar(linhas), "suspeitos_descartados": suspeitos}
     if spec.get("modo") == "taxas":
         return {**mesclar_taxas(linhas), "suspeitos_descartados": suspeitos}
     n = ag.importar(str(arq), origem="revisao na sessao") if linhas else 0
@@ -366,14 +388,16 @@ def main():
     ap.add_argument("--completo", action="store_true", help="regulamento inteiro em vez de trechos")
     ap.add_argument("--tamanho", type=int, default=25, help="fundos por agente")
     ap.add_argument("--taxas", action="store_true", help="passada só de taxas (fundos já lidos sem taxa)")
+    ap.add_argument("--pdd", action="store_true", help="política de PDD das demonstrações financeiras")
     a = ap.parse_args()
     if a.acao == "preparar":
         cs = open(a.cnpjs).read().split() if a.cnpjs else None
-        preparar(a.limite, a.dir, a.tamanho, cs, a.completo, a.taxas)
+        preparar(a.limite, a.dir, a.tamanho, cs, a.completo, a.taxas, a.pdd)
     elif a.acao == "importar":
         print(json.dumps(importar(a.dir), ensure_ascii=False))
     else:
-        print(len(fila_taxas(100000) if a.taxas else fila(100000)))
+        from . import pdd_docs
+        print(len(pdd_docs.fila(100000) if a.pdd else fila_taxas(100000) if a.taxas else fila(100000)))
 
 
 if __name__ == "__main__":
