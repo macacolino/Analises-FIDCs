@@ -34,7 +34,7 @@ export default function Feedback() {
         <div className="card feedback-box stack" style={{ gap: 8 }}>
           <div className="row"><b>Feedback desta tela</b><div className="spacer" />
             <button className="ghost" onClick={() => setAberto(false)} aria-label="Fechar">✕</button></div>
-          <input placeholder="Seu nome" value={nome} onChange={(e) => setNome(e.target.value)} />
+          <input type="text" placeholder="Seu nome" value={nome} onChange={(e) => setNome(e.target.value)} />
           <textarea placeholder="O que está errado, confuso ou faltando? Pode citar o número que não bate." value={texto}
             onChange={(e) => setTexto(e.target.value)} rows={5} autoFocus />
           <div className="row">
