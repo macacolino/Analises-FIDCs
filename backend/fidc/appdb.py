@@ -102,11 +102,16 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
 @contextmanager
 def session(path: Path | None = None):
     con = connect(path)
+    antes = con.total_changes
     try:
         yield con
         con.commit()
+        mudou = con.total_changes != antes
     finally:
         con.close()
+    if mudou and path is None:
+        from . import persistencia
+        persistencia.alterou()
 
 
 def overrides(path: Path | None = None) -> dict[str, str]:

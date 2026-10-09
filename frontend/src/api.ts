@@ -37,7 +37,8 @@ export type Dic = Record<string, DicItem>
 
 export const useDic = () => useApi<Dic>('/api/dicionario', { staleTime: Infinity })
 
-export type Meta = { atualizado_em: string; ultimo_mes: string; mes_referencia: string; fundos_ativos: number; etl: any }
+export type Meta = { atualizado_em: string; ultimo_mes: string; mes_referencia: string; fundos_ativos: number; etl: any
+  persistencia?: { ativo: boolean; ultimo_envio: string | null; erro: string | null } }
 export const useMeta = () => useApi<Meta>('/api/meta', { staleTime: 60_000 })
 
 export type Categoria = { id: string; nome: string; grupo: string }

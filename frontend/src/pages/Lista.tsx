@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { send, useApi, type Row } from '../api'
+import { send, useApi, useMeta, type Row } from '../api'
 import { DataGrid } from '../components/DataGrid'
 import { Loading } from '../components/ui'
 import { brl, fmtDate } from '../fmt'
@@ -10,6 +10,7 @@ const TITULO = { carteira: 'Carteira', watchlist: 'Watchlist' }
 
 export default function Lista({ tipo }: { tipo: 'carteira' | 'watchlist' }) {
   const qc = useQueryClient()
+  const meta = useMeta()
   const url = `/api/listas/${tipo}`
   const painel = useApi<Row[]>(url, { staleTime: 0 })
   const [verEventos, setVerEventos] = useState(false)
@@ -31,6 +32,10 @@ export default function Lista({ tipo }: { tipo: 'carteira' | 'watchlist' }) {
         <div className="spacer" />
         <a className="btn" href={`${url}/relatorio.xlsx`}>⬇ Relatório mensal (Excel)</a>
       </div>
+      {meta.data?.persistencia?.erro && (
+        <div className="alert sev-alta"><span className="dot" aria-hidden />
+          <span><b>Atenção:</b> as alterações desta lista podem não estar sendo salvas ({meta.data.persistencia.erro}).</span></div>
+      )}
       <Adicionar tipo={tipo} onDone={refresh} />
       <div className="card">
         <Loading q={painel} />

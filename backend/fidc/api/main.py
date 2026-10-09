@@ -30,6 +30,8 @@ log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app):
+    from .. import persistencia
+    log.info("persistência do app.sqlite: %s", persistencia.baixar())   # antes de qualquer acesso ao app.sqlite
     try:
         comparacao.seed_grupos()
     except Exception:  # noqa: BLE001 - seed é conveniência
@@ -83,7 +85,8 @@ def _jsonable(obj):
 # ------------------------------------------------------------------ meta
 @app.get("/api/meta")
 def meta():
-    return {**consultas.meta(), "etl": ETL_STATUS}
+    from .. import persistencia
+    return {**consultas.meta(), "etl": ETL_STATUS, "persistencia": persistencia.ESTADO}
 
 
 @app.get("/api/dicionario")

@@ -109,9 +109,21 @@ Trocar a senha: atualize o secret `FIDC_SENHA` e rode de novo a publicação. Qu
 - **Dados**: a base vai pronta dentro da imagem e é refeita a cada publicação. A rodada noturna de IA faz push todo
   dia, então o link amanhece atualizado. O agendamento diário às 7h do workflow (e o botão "Run workflow") só passam a
   valer quando o arquivo do workflow estiver no branch `main`, regra do GitHub.
-- **Notas, carteira, watchlist e troca manual de categoria** ficam gravados no disco temporário do Cloud Run e
-  **somem quando a instância reinicia ou há nova publicação**. Na fase de testes, use o botão Feedback (que vai para a
-  planilha) para tudo que precisa ficar registrado.
+- **Carteira, watchlist, notas e checklist de DD** ficam no `app.sqlite`, que o app copia para o bucket
+  `<projeto>-app` do Cloud Storage a cada alteração e restaura quando a instância sobe (`fidc/persistencia.py`).
+  Por isso o serviço roda com no máximo 1 instância. Criar o bucket (uma vez, no Cloud Shell):
+
+  ```bash
+  P=analise-fidc; N=$(gcloud projects describe $P --format='value(projectNumber)')
+  gcloud storage buckets create gs://$P-app --project=$P --location=us-central1 --uniform-bucket-level-access
+  gcloud storage buckets update gs://$P-app --versioning
+  gcloud storage buckets add-iam-policy-binding gs://$P-app \
+    --member=serviceAccount:$N-compute@developer.gserviceaccount.com --role=roles/storage.objectAdmin
+  ```
+
+  Com o versionamento, cada versão anterior fica guardada (dá para voltar atrás). Sem o bucket, a tela da carteira
+  mostra um aviso de que as alterações não estão sendo salvas.
+- **Troca manual de categoria** ainda não reclassifica no Cloud Run (a reclassificação roda no build).
 - **Primeiro acesso depois de um tempo parado** leva alguns segundos (a instância desliga sem uso, por isso o custo é
   baixo).
 
