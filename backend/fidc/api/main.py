@@ -1,7 +1,7 @@
 """API do Analisador de FIDCs.
 
 Toda rota de tabela aceita ?formato=xlsx para baixar em Excel.
-Sem autenticação nesta fase: proteger na borda (ex.: Cloudflare Access) quando for exposto.
+Com FIDC_SENHA definida, tudo exige a senha única do time (acesso.py); sem ela, fica aberto (uso local).
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .. import appdb, comparacao, config, consultas, dicionario, excel, fnet
-from . import v2
+from . import acesso, v2
 from ..etl import pipeline
 from ..taxonomy import classify
 
@@ -42,6 +42,7 @@ async def lifespan(_app):
 
 app = FastAPI(title="Analisador de FIDCs", version="0.1.0", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=2000)
+app.middleware("http")(acesso.middleware)
 
 ETL_STATUS: dict = {"rodando": False, "ultimo": None}
 
@@ -379,6 +380,7 @@ def _runtime(_, exc: RuntimeError):
     return JSONResponse({"detail": str(exc)}, status_code=503)
 
 
+app.include_router(acesso.router)
 app.include_router(v2.router)
 
 

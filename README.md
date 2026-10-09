@@ -134,6 +134,8 @@ A tabela (AG Grid) usa os mesmos tokens.
   linha), rentabilidade por série vs. CDI (acumulada e mês a mês), PL por classe, subordinação vs. mínimo, inadimplência
   e PDD, carteira por faixa, posição vs. pares e cedentes. Abre em nova aba (`/lamina/<cnpj>`) e chama "Salvar como PDF"
   do navegador (A4, margens nenhuma, gráficos de plano de fundo marcado).
+- **Versão de testes para o time** (Google Cloud Run, senha única, botão Feedback → planilha Google): passo a passo em
+  [`docs/deploy-cloud-run.md`](docs/deploy-cloud-run.md). Publica sozinho a cada push (`.github/workflows/cloudrun.yml`).
 - **PDD por administrador** (`/pdd`): (1) régua praticada, pelo informe: PDD declarada ÷ régua da Res. CMN 2.682 aplicada
   às parcelas vencidas (piso) e curva implícita por faixa de atraso (mínimos quadrados não negativos, crescente, 12 meses);
   (2) política escrita: nota de PDD das demonstrações financeiras no FNET lida por agente (`fidc/pdd_docs.py`; método,

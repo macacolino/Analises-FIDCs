@@ -9,3 +9,4 @@ pytz
 pytest>=8
 pypdf>=5
 anthropic>=1.11
+python-multipart>=0.0.9

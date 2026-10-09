@@ -2,8 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 
 export type Row = Record<string, any>
 
+/** Sessão expirada (senha do time): volta para o login e retorna depois para a mesma tela. */
+function checarSessao(r: Response) {
+  if (r.status === 401) window.location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`
+}
+
 export async function get<T = any>(url: string): Promise<T> {
   const r = await fetch(url)
+  checarSessao(r)
   if (!r.ok) {
     let msg = `${r.status}`
     try { msg = (await r.json()).detail ?? msg } catch { /* sem corpo */ }
@@ -18,6 +24,7 @@ export async function send(method: string, url: string, body?: unknown) {
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   })
+  checarSessao(r)
   if (!r.ok) throw new Error(`${r.status}`)
   return r.json()
 }

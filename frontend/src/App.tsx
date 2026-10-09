@@ -1,6 +1,7 @@
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useMeta } from './api'
 import { fmtDate, mesAno } from './fmt'
+import Feedback from './components/Feedback'
 import FundPicker from './components/FundPicker'
 import { Icone } from './components/Icones'
 import Comparar from './pages/Comparar'
@@ -79,6 +80,7 @@ export default function App() {
         </Routes>
       </main>
       </div>
+      <Feedback />
     </div>
   )
 }

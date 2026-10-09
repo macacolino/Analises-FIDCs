@@ -1,0 +1,36 @@
+# Imagem para o Cloud Run: a base é construída NO BUILD (dados públicos da CVM/BCB + resultados versionados em
+# backend/fidc/seed) e vai pronta dentro da imagem. O app só lê; atualização = novo build (GitHub Actions, diário).
+# --- frontend
+FROM node:22-alpine AS web
+WORKDIR /web
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+RUN npm run build
+
+# --- dependências Python (compartilhadas entre o ETL e o app)
+FROM python:3.12-slim AS base
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
+COPY backend/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+ENV TZ=America/Sao_Paulo PYTHONUNBUFFERED=1
+
+# --- ETL: baixa e processa o histórico (5-10 min)
+FROM base AS etl
+COPY backend/ ./backend/
+ENV FIDC_DATA_DIR=/build
+WORKDIR /app/backend
+RUN python -m fidc.etl && ls -la /build/fidc.duckdb
+
+# --- app
+FROM base
+COPY backend/ ./backend/
+COPY --from=web /web/dist ./frontend/dist
+COPY --from=etl /build/fidc.duckdb /app/data/fidc.duckdb
+ENV FIDC_DATA_DIR=/app/data \
+    FIDC_STATIC_DIR=/app/frontend/dist \
+    FIDC_AGENDADOR=0
+WORKDIR /app/backend
+# o Cloud Run informa a porta em $PORT
+CMD ["sh", "-c", "exec uvicorn fidc.api.main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips='*'"]
