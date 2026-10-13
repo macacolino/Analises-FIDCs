@@ -136,6 +136,11 @@ A tabela (AG Grid) usa os mesmos tokens.
   do navegador (A4, margens nenhuma, gráficos de plano de fundo marcado).
 - **Versão de testes para o time** (Google Cloud Run, senha única, botão Feedback → planilha Google): passo a passo em
   [`docs/deploy-cloud-run.md`](docs/deploy-cloud-run.md). Publica sozinho a cada push (`.github/workflows/cloudrun.yml`).
+- **Consultorias de crédito** (`/consultorias`): consultora especializada e agente de cobrança de cada FIDC pelo
+  regulamento (`fidc/consultoria.py`): regras pegam a definição explícita (nome + CNPJ); o agente lê as páginas sobre
+  consultoria/cobrança e marca parte relacionada. Tela por consultoria com fundos ativos, PL, inadimplência e PDD
+  medianas e fundos com red flag vermelha; consultoria também na ficha do fundo, na Pesquisa e na lâmina.
+  `python -m fidc.consultoria --regras`; `python -m fidc.agente_sessao preparar --consultoria`; `--seed`.
 - **PDD por administrador** (`/pdd`): (1) régua praticada, pelo informe: PDD declarada ÷ régua da Res. CMN 2.682 aplicada
   às parcelas vencidas (piso) e curva implícita por faixa de atraso (mínimos quadrados não negativos, crescente, 12 meses);
   (2) política escrita: nota de PDD das demonstrações financeiras no FNET lida por agente (`fidc/pdd_docs.py`; método,

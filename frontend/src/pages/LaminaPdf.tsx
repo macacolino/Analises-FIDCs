@@ -580,6 +580,8 @@ function montar(lam: any, hist: Row[], men: MensalResp, comp: any, ext: Extra, s
     ? `${SEG[h.segmento_principal] ?? h.segmento_principal} (${p1(h.segmento_principal_pct)})` : null
   const ficha: [string, any][] = [
     ['Gestor', h.gestor], ['Administrador', h.admin], ['Custodiante', h.custodiante], ['Auditor', h.auditor],
+    ...(h.consultoria ? [['Consultoria de crédito', `${h.consultoria}${h.consultoria_relacionada === 'Sim' ? ' (parte relacionada)' : ''}`] as [string, any]] : []),
+    ...(h.agente_cobranca ? [['Agente de cobrança', h.agente_cobranca] as [string, any]] : []),
     ['Início', fmtDate(h.data_inicio)], ['Condomínio', `${cap(String(h.condominio ?? '–').toLowerCase())}${h.exclusivo === 'S' ? ' · exclusivo' : ''}`],
     ['Categoria (interna)', h.categoria_nome], ...(segPrincipal ? [['Segmento CVM principal', segPrincipal] as [string, any]] : []),
     ['Cotistas', fmtValue(k.nr_cotistas, 'int')], ['Prazo médio da carteira', fmtValue(k.prazo_medio_dias, 'dias')],

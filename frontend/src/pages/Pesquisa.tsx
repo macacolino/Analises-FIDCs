@@ -45,7 +45,7 @@ export default function Pesquisa() {
       </div>
       <div className="card">
         <DataGrid rows={res.data} exportUrl={url} height={620}
-          cols={['nome', 'cnpj', 'categoria_nome', 'gestor', 'admin', 'pl', 'inad_90', 'pdd_carteira',
+          cols={['nome', 'cnpj', 'categoria_nome', 'gestor', 'admin', 'consultoria', 'pl', 'inad_90', 'pdd_carteira',
                  'subordinacao', 'rentab_senior', 'ultimo_informe',
                  { field: 'revisar', valueFormatter: (p: any) => (p.value ? 'revisar' : ''), width: 90 },
                  { field: 'ia_diverge_informe', headerName: 'Regulamento x carteira', width: 130,

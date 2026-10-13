@@ -351,6 +351,26 @@ def pdd_fundos(admin: str | None = None, formato: str | None = None):
     return _out(d, formato, "PDD por fundo")
 
 
+@router.get("/consultorias")
+def consultorias(formato: str | None = None):
+    """Consultorias de crédito nomeadas nos regulamentos, com os fundos ativos que atendem (último informe)."""
+    d = df("SELECT * FROM consultoria_resumo ORDER BY fundos DESC, pl DESC")
+    return _out(d, formato, "Consultorias de crédito",
+                "Consultora especializada identificada no regulamento mais recente do FNET (regras + leitura por IA). "
+                "Fundos ativos (informe nos últimos 3 meses); indicadores do último informe.")
+
+
+@router.get("/consultorias/fundos")
+def consultorias_fundos(chave: str | None = None, formato: str | None = None):
+    d = df("""SELECT c.*, f.nome, f.admin, f.gestor, f.categoria_nome, f.pl, m.inad_90, m.pdd_carteira, m.subordinacao
+              FROM consultoria_fundo c JOIN fundo f USING (cnpj)
+              LEFT JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
+              WHERE (? IS NULL OR c.consultoria_chave = ?) AND c.consultoria_situacao = 'nomeada'
+                AND f.ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH
+              ORDER BY f.pl DESC NULLS LAST""", [chave, chave])
+    return _out(d, formato, "Fundos por consultoria")
+
+
 @router.get("/fundos/{cnpj}/regulamento")
 def regulamento(cnpj: str):
     return _clean(derivados_regulamento(cnpj))

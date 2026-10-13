@@ -84,6 +84,12 @@ export default function Fundo() {
         </div>
         <div className="ficha-grid">
           {([['Gestor', h.gestor], ['Administrador', h.admin], ['Custodiante', h.custodiante], ['Auditor', h.auditor],
+            ['Consultoria de crédito', h.consultoria ? (
+              <span title={`${h.consultoria_cnpj ?? ''}${h.consultoria_relacionada === 'Sim' ? ` · parte relacionada (${h.consultoria_relacionada_com ?? ''})` : ''} · fonte: regulamento (${h.consultoria_origem})${h.consultoria_trecho ? ` — "${h.consultoria_trecho}"` : ''}`}>
+                <Link to={`/consultorias?c=${encodeURIComponent(h.consultoria_chave ?? '')}`}>{h.consultoria}</Link>
+                {h.consultoria_relacionada === 'Sim' && <span className="badge warn" style={{ marginLeft: 6 }}>parte relacionada</span>}
+              </span>) : h.consultoria_situacao === 'prevista_sem_nome' ? 'Prevista no regulamento, sem nome' : h.consultoria_situacao ? 'Não há / não citada' : null],
+            ['Agente de cobrança', h.agente_cobranca],
             ['Condomínio', `${h.condominio ?? '–'}${h.exclusivo === 'S' ? ' · exclusivo' : ''}`], ['Situação CVM', h.situacao],
             ['Início (cadastro)', fmtDate(h.data_inicio)], ['Informes', `${mesAno(h.primeiro_informe)} a ${mesAno(h.ultimo_informe)}`],
           ] as [string, any][]).map(([l, v]) => <div key={l}><span>{l}</span><b>{v ?? '–'}</b></div>)}

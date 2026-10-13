@@ -66,9 +66,10 @@ def buscar(q: str = "", categoria: str | None = None, grupo: str | None = None,
     sql = f"""
         SELECT f.cnpj, f.nome, f.categoria, f.categoria_nome, f.grupo, f.gestor, f.admin, f.pl,
                f.ultimo_informe, f.revisar, c.ia_diverge_informe, m.inad_90, m.pdd_carteira, m.subordinacao,
-               m.rentab_senior
+               m.rentab_senior, k.consultoria, k.agente_cobranca
         FROM fundo f LEFT JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
         LEFT JOIN classificacao c ON c.cnpj = f.cnpj
+        LEFT JOIN consultoria_fundo k ON k.cnpj = f.cnpj
         {'WHERE ' + ' AND '.join(where) if where else ''}
         ORDER BY f.pl DESC NULLS LAST LIMIT {int(limit)}"""
     return df(sql, params)
@@ -82,8 +83,11 @@ def lamina(cnpj: str) -> dict | None:
                c.segmento_principal, c.segmento_principal_pct, c.ia_carteira_compat, c.ia_diverge_informe,
                ia.tese AS ia_tese, f.gestor, f.admin, k.custodiante, k.auditor,
                k.data_inicio, k.situacao, k.publico_alvo, f.condominio, f.exclusivo, f.ultimo_informe,
-               m.primeiro_informe
+               m.primeiro_informe, cs.consultoria, cs.consultoria_cnpj, cs.consultoria_chave, cs.consultoria_situacao,
+               cs.consultoria_relacionada, cs.consultoria_relacionada_com, cs.agente_cobranca, cs.consultoria_origem,
+               cs.consultoria_confianca, cs.consultoria_trecho, cs.consultoria_pagina
         FROM fundo f JOIN classificacao c USING (cnpj) LEFT JOIN cadastro k USING (cnpj)
+        LEFT JOIN consultoria_fundo cs ON cs.cnpj = f.cnpj
         LEFT JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
         LEFT JOIN regulamento_ia ia ON ia.cnpj = f.cnpj
         WHERE f.cnpj = ?""", [cnpj])

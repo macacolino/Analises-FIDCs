@@ -5,6 +5,7 @@ import Feedback from './components/Feedback'
 import FundPicker from './components/FundPicker'
 import { Icone } from './components/Icones'
 import Comparar from './pages/Comparar'
+import Consultorias from './pages/Consultorias'
 import Fundo from './pages/Fundo'
 import Glossario from './pages/Glossario'
 import Qualidade from './pages/Qualidade'
@@ -48,6 +49,7 @@ export default function App() {
           <Item to="/watchlist" icone="watchlist">Watchlist</Item>
           <div className="grp">Referência</div>
           <Item to="/pdd" icone="pdd">PDD por administrador</Item>
+          <Item to="/consultorias" icone="consultoria">Consultorias de crédito</Item>
           <Item to="/qualidade" icone="qualidade">Qualidade do dado</Item>
           <Item to="/glossario" icone="glossario">Glossário</Item>
         </nav>
@@ -72,6 +74,7 @@ export default function App() {
           <Route path="/comparar" element={<Comparar />} />
           <Route path="/qualidade" element={<Qualidade />} />
           <Route path="/pdd" element={<Pdd />} />
+          <Route path="/consultorias" element={<Consultorias />} />
           <Route path="/glossario" element={<Glossario />} />
           <Route path="/fundo/:cnpj" element={<Fundo />} />
           <Route path="/carteira" element={<Lista tipo="carteira" />} />
