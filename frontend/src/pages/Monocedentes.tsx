@@ -9,13 +9,15 @@ type Aba = 'bt' | 'universo' | 'calibracao'
 
 const COLS = ['nome', 'bt_score', 'bt_faixa', 'bt_estagio', 'bt_meses_estagio1', 'mono_grupo', 'mono_conc_grupo',
   'mono_grupo_cnpjs', 'pl', 'nr_cotistas', 'estrutura', 'taxa_gestao', 'spread_senior_aa', 'rentab_subordinada_12m_pct_cdi',
-  'gestor', 'admin', 'categoria_nome', 'bt_rotulo', 'bt_sinais']
+  'bt_ia_sub', 'bt_ia_indicio', 'gestor', 'admin', 'categoria_nome', 'bt_rotulo', 'bt_sinais']
 const VISOES: Visao[] = [
   { nome: 'Triagem', cols: ['bt_score', 'bt_faixa', 'bt_estagio', 'mono_grupo', 'pl', 'nr_cotistas', 'taxa_gestao', 'gestor', 'bt_sinais'] },
   { nome: 'Estrutura', cols: ['bt_estagio', 'bt_meses_estagio1', 'bt_inicio', 'estrutura', 'nr_cotistas', 'cotistas_senior',
     'cotistas_subordinada', 'subordinacao', 'pl'] },
   { nome: 'Economia', cols: ['bt_score', 'taxa_gestao', 'taxa_administracao', 'spread_senior_aa', 'rentab_subordinada_12m_pct_cdi',
     'taxa_desconto_aa', 'inad_90', 'pdd_carteira'] },
+  { nome: 'Regulamento', cols: ['bt_score', 'bt_ia_sub', 'bt_ia_sub_nome', 'bt_ia_coobrigacao', 'bt_ia_indicio',
+    'bt_ia_justificativa', 'bt_ia_cedente'] },
   { nome: 'Cedente', cols: ['mono_grupo', 'mono_grupo_cnpjs', 'mono_conc_grupo', 'mono_conc_carteira', 'mono_cedentes_informados',
     'bt_nome_cedente', 'categoria_nome'] },
 ]
@@ -38,6 +40,18 @@ function Detalhe({ f, onFechar }: { f: Row; onFechar: () => void }) {
           ))}
         </ul>
       </div>
+      {f.bt_ia_sub && (
+        <div className="stack" style={{ gap: 4 }}>
+          <b>Regulamento (leitura IA)</b>
+          <div>Subordinada: <b>{String(f.bt_ia_sub).replaceAll('_', ' ')}</b>{f.bt_ia_sub_nome ? ` (${f.bt_ia_sub_nome})` : ''}
+            {' · '}coobrigação do cedente: {f.bt_ia_coobrigacao ?? '–'} · indício: <b>{f.bt_ia_indicio}</b></div>
+          {f.bt_ia_cedente && <div className="muted">Cedente: {f.bt_ia_cedente}</div>}
+          {f.bt_ia_objetivo && <div className="muted">Objetivo: {f.bt_ia_objetivo}</div>}
+          {f.bt_ia_justificativa && <div>{f.bt_ia_justificativa}</div>}
+          {f.bt_ia_trecho && <blockquote className="muted" style={{ margin: 0, paddingLeft: 10, borderLeft: '3px solid var(--grid)' }}>
+            “{f.bt_ia_trecho}”{f.bt_ia_pagina ? ` (p. ${f.bt_ia_pagina})` : ''}</blockquote>}
+        </div>
+      )}
       <Loading q={g} />
       {g.data && <DataGrid title="Cedentes por grupo econômico" rows={g.data} id="mono-grupos" pinned={0}
         cols={['ordem', 'grupo', 'n_cnpjs', 'pct_carteira', 'pct_informados', 'cnpjs']} />}

@@ -19,6 +19,8 @@ Sinais (pontos):
 - concentração no grupo: >= 95%: +10; 80-95%: +5; grupo com mais de um CNPJ (várias empresas do grupo): +5
 - nome do fundo aparece no cedente ou nos sócios do cedente: +10 (nem sempre: às vezes a ideia é distanciar)
 - fundo exclusivo: +5
+- regulamento (leitura IA, fidc.mono_ia): subordinada do cedente ou do grupo/acionistas +20; de investidores de
+  mercado -10; fundo restrito a um cotista/grupo +5; indício lido alto +10, baixo -10
 Faixas: >= 45 provável; 30-44 possível; < 30 improvável. Cedente grande empresa (S.A. aberta ou capital social
 >= R$ 1 bi) fica fora por ora: "excluído (grande empresa)" - pode ser FIDC cativo, antecipação a fornecedores etc.
 """
@@ -166,6 +168,11 @@ def build_table(con) -> None:
         LEFT JOIN fundo_resumo r ON r.cnpj = f.cnpj LEFT JOIN cadastro k ON k.cnpj = f.cnpj
         WHERE f.categoria NOT IN ('fic_fidc')""").df()
     rot = _rotulos()
+    try:
+        from . import mono_ia
+        ia = mono_ia.linhas()
+    except Exception:  # noqa: BLE001
+        ia = {}
     linhas, grupos_out = [], []
     for f in fundos.itertuples(index=False):
         cs = por_fundo.get(f.cnpj, [])
@@ -240,6 +247,20 @@ def build_table(con) -> None:
             s(10, "nome do fundo no cedente/sócios: " + ", ".join(nome_bate[:3]))
         if isinstance(f.exclusivo, str) and f.exclusivo.upper().startswith("S"):
             s(5, "fundo exclusivo")
+        # leitura do regulamento (IA): quem é dono da subordinada pesa mais que qualquer número do informe
+        x = ia.get(f.cnpj) or {}
+        sub = x.get("subordinada_subscritor")
+        if sub in ("cedente", "acionistas_ou_grupo_do_cedente"):
+            s(20, "regulamento: subordinada do " + ("cedente" if sub == "cedente" else "grupo/acionistas do cedente"))
+        elif sub == "terceiros_investidores":
+            s(-10, "regulamento: subordinada de investidores de mercado")
+        if x.get("cotista_exclusivo_ou_grupo") is True and not (isinstance(f.exclusivo, str) and f.exclusivo.upper().startswith("S")):
+            s(5, "regulamento: fundo restrito a um cotista/grupo")
+        ind = x.get("indicio_beneficio_tributario")
+        if ind == "alto":
+            s(10, "leitura do regulamento: indício alto")
+        elif ind == "baixo":
+            s(-10, "leitura do regulamento: indício baixo")
 
         estrutura = f.estrutura
         if cot is not None and estrutura == "classe única" and cot <= 5:
@@ -264,6 +285,10 @@ def build_table(con) -> None:
             "bt_meses_estagio1": m1, "bt_inicio": ini, "bt_estagio": estagio, "bt_score": pts, "bt_faixa": faixa,
             "bt_sinais": " | ".join(sinais), "bt_nome_cedente": ", ".join(nome_bate) or None,
             "bt_rotulo": r.get("rotulo"), "bt_rotulo_obs": r.get("obs"),
+            "bt_ia_sub": sub, "bt_ia_sub_nome": x.get("subordinada_subscritor_nome"),
+            "bt_ia_coobrigacao": x.get("coobrigacao_cedente"), "bt_ia_indicio": ind,
+            "bt_ia_justificativa": x.get("justificativa"), "bt_ia_trecho": x.get("trecho"), "bt_ia_pagina": x.get("pagina"),
+            "bt_ia_cedente": x.get("cedente_nome"), "bt_ia_objetivo": x.get("objetivo"),
         })
     df = pd.DataFrame(linhas)
     con.register("_m", df)

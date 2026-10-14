@@ -386,7 +386,9 @@ def monocedentes(todos: bool = False, formato: str | None = None):
                       m.mono_conc_carteira, m.mono_cedentes_informados, m.monocedente, me.nr_cotistas, r.estrutura,
                       r.cotistas_senior, r.cotistas_subordinada, r.taxa_gestao, r.taxa_administracao, r.spread_senior_aa,
                       r.rentab_subordinada_12m_pct_cdi, r.taxa_desconto_aa, me.subordinacao, me.inad_90, me.pdd_carteira,
-                      m.bt_nome_cedente, m.bt_sinais, f.ultimo_informe
+                      m.bt_nome_cedente, m.bt_sinais, m.bt_ia_sub, m.bt_ia_sub_nome, m.bt_ia_coobrigacao, m.bt_ia_indicio,
+                      m.bt_ia_justificativa, m.bt_ia_trecho, m.bt_ia_pagina, m.bt_ia_cedente, m.bt_ia_objetivo,
+                      f.ultimo_informe
                FROM mono_fundo m JOIN fundo f USING (cnpj)
                LEFT JOIN metricas_mes me ON me.cnpj = f.cnpj AND me.dt = f.ultimo_informe
                LEFT JOIN fundo_resumo r ON r.cnpj = f.cnpj

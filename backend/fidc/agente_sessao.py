@@ -266,11 +266,12 @@ def _completo(paginas: list[str]) -> str:
 
 
 def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = None, completo: bool = False,
-             taxas: bool = False, pdd: bool = False, consultoria: bool = False) -> int:
+             taxas: bool = False, pdd: bool = False, consultoria: bool = False, mono: bool = False) -> int:
     """Monta o lote. `cnpjs` força a lista (auditoria); `completo` manda o regulamento inteiro em vez de trechos;
     `taxas` faz a passada só de taxas (fila própria, trechos curtos, schema reduzido); `pdd` lê a nota de PDD das
     demonstrações financeiras (pdd_docs)."""
     from . import consultoria as cs
+    from . import mono_ia
     from . import pdd_docs as pd_
     base = Path(d)
     (base / "in").mkdir(parents=True, exist_ok=True)
@@ -280,8 +281,8 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
         nomes = dict(df("SELECT cnpj, nome FROM fundo").values)
         itens = [(c, nomes.get(c, "")) for c in cnpjs]
     else:
-        itens = cs.fila(limite) if consultoria else pd_.fila(limite) if pdd else fila_taxas(limite) if taxas \
-            else fila(limite)
+        itens = mono_ia.fila(limite) if mono else cs.fila(limite) if consultoria else pd_.fila(limite) if pdd \
+            else fila_taxas(limite) if taxas else fila(limite)
     if pdd:     # baixa as demonstrações financeiras que ainda não foram buscadas
         con = pd_.db()
         feitos = {c for (c,) in con.execute("SELECT cnpj FROM reg_pdd_doc")}
@@ -299,8 +300,8 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
             print(json.dumps({"busca_documentos": td.rodar(falta)}))
     ok = []
     for cnpj, nome in itens:
-        if pdd or consultoria:
-            t = (pd_ if pdd else cs).texto(cnpj)
+        if pdd or consultoria or mono:
+            t = (pd_ if pdd else mono_ia if mono else cs).texto(cnpj)
             if t:
                 (base / "in" / f"{cnpj}.txt").write_text(f"Fundo: {nome} (CNPJ {cnpj})\n\n{t}")
                 ok.append(cnpj)
@@ -330,13 +331,14 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
         os.remove(f)
     for i in range(k):
         (base / f"lista_{i:02d}.txt").write_text("\n".join(ok[i::k]))
-    spec = {"instrucoes": cs.INSTRUCOES, "schema": cs.SCHEMA, "modo": "consultoria"} if consultoria else \
+    spec = {"instrucoes": mono_ia.INSTRUCOES, "schema": mono_ia.SCHEMA, "modo": "mono"} if mono else \
+        {"instrucoes": cs.INSTRUCOES, "schema": cs.SCHEMA, "modo": "consultoria"} if consultoria else \
         {"instrucoes": pd_.INSTRUCOES, "schema": pd_.SCHEMA, "modo": "pdd"} if pdd else \
         {"instrucoes": INSTRUCOES_TAXAS, "schema": SCHEMA_TAXAS, "modo": "taxas"} if taxas else \
         {"instrucoes": ag.INSTRUCOES, "schema": ag.SCHEMA}
     (base / "spec.json").write_text(json.dumps(spec, ensure_ascii=False))
     (base / "gravar.py").write_text(GRAVAR)
-    prompt = cs.PROMPT if consultoria else pd_.PROMPT if pdd else PROMPT_TAXAS if taxas else PROMPT
+    prompt = mono_ia.PROMPT if mono else cs.PROMPT if consultoria else pd_.PROMPT if pdd else PROMPT_TAXAS if taxas else PROMPT
     (base / "PROMPT.md").write_text(prompt.format(dir=str(base.resolve())) + (COMPLETO if completo else ""))
     print(json.dumps({"fundos": len(ok), "partes": k if ok else 0, "dir": str(base.resolve())}))
     return k if ok else 0
@@ -367,6 +369,9 @@ def importar(d: str) -> dict:
     arq = base / "validos.jsonl"
     arq.write_text("".join(linhas), encoding="utf-8")
     spec = json.loads((base / "spec.json").read_text())
+    if spec.get("modo") == "mono":
+        from . import mono_ia
+        return {**mono_ia.importar(linhas), "suspeitos_descartados": suspeitos}
     if spec.get("modo") == "consultoria":
         from . import consultoria
         return {**consultoria.importar(linhas), "suspeitos_descartados": suspeitos}
@@ -420,15 +425,16 @@ def main():
     ap.add_argument("--taxas", action="store_true", help="passada só de taxas (fundos já lidos sem taxa)")
     ap.add_argument("--pdd", action="store_true", help="política de PDD das demonstrações financeiras")
     ap.add_argument("--consultoria", action="store_true", help="consultoria de crédito e agente de cobrança")
+    ap.add_argument("--mono", action="store_true", help="estrutura de monocedentes (benefício tributário)")
     a = ap.parse_args()
     if a.acao == "preparar":
         cs = open(a.cnpjs).read().split() if a.cnpjs else None
-        preparar(a.limite, a.dir, a.tamanho, cs, a.completo, a.taxas, a.pdd, a.consultoria)
+        preparar(a.limite, a.dir, a.tamanho, cs, a.completo, a.taxas, a.pdd, a.consultoria, a.mono)
     elif a.acao == "importar":
         print(json.dumps(importar(a.dir), ensure_ascii=False))
     else:
-        from . import consultoria, pdd_docs
-        print(len(consultoria.fila(100000) if a.consultoria else pdd_docs.fila(100000) if a.pdd
+        from . import consultoria, mono_ia, pdd_docs
+        print(len(mono_ia.fila(100000) if a.mono else consultoria.fila(100000) if a.consultoria else pdd_docs.fila(100000) if a.pdd
                   else fila_taxas(100000) if a.taxas else fila(100000)))
 
 
