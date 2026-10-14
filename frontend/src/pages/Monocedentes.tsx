@@ -7,7 +7,8 @@ import { fmtValue } from '../fmt'
 
 type Aba = 'bt' | 'universo' | 'calibracao'
 
-const COLS = ['nome', 'bt_score', 'bt_faixa', 'bt_estagio', 'bt_meses_estagio1', 'mono_grupo', 'mono_conc_grupo',
+const COLS = ['nome', 'bt_score', 'bt_faixa', 'bt_estagio', 'bt_meses_estagio1', 'mono_grupo', 'mono_grupo_atividade',
+  'mono_conc_grupo',
   'mono_grupo_cnpjs', 'pl', 'nr_cotistas', 'estrutura', 'taxa_gestao', 'spread_senior_aa', 'rentab_subordinada_12m_pct_cdi',
   'bt_ia_sub', 'bt_ia_indicio', 'gestor', 'admin', 'categoria_nome', 'bt_rotulo', 'bt_sinais']
 const VISOES: Visao[] = [
@@ -19,7 +20,7 @@ const VISOES: Visao[] = [
   { nome: 'Regulamento', cols: ['bt_score', 'bt_ia_sub', 'bt_ia_sub_nome', 'bt_ia_coobrigacao', 'bt_ia_indicio',
     'bt_ia_justificativa', 'bt_ia_cedente'] },
   { nome: 'Cedente', cols: ['mono_grupo', 'mono_grupo_cnpjs', 'mono_conc_grupo', 'mono_conc_carteira', 'mono_cedentes_informados',
-    'bt_nome_cedente', 'categoria_nome'] },
+    'mono_grupo_cnae', 'mono_grupo_atividade', 'bt_nome_cedente', 'categoria_nome'] },
 ]
 
 function Detalhe({ f, onFechar }: { f: Row; onFechar: () => void }) {
@@ -54,7 +55,7 @@ function Detalhe({ f, onFechar }: { f: Row; onFechar: () => void }) {
       )}
       <Loading q={g} />
       {g.data && <DataGrid title="Cedentes por grupo econômico" rows={g.data} id="mono-grupos" pinned={0}
-        cols={['ordem', 'grupo', 'n_cnpjs', 'pct_carteira', 'pct_informados', 'cnpjs']} />}
+        cols={['ordem', 'grupo', 'atividade', 'cnae', 'n_cnpjs', 'pct_carteira', 'pct_informados', 'cnpjs']} />}
     </div>
   )
 }
@@ -69,7 +70,8 @@ export default function Monocedentes() {
   const dados = q.data ?? []
   const universo = useMemo(() => dados.filter((r) => r.monocedente), [dados])
   const bt = useMemo(() => universo.filter((r) => r.bt_faixa === 'provável' || r.bt_faixa === 'possível'), [universo])
-  const grandes = useMemo(() => universo.filter((r) => String(r.bt_faixa).startsWith('excluído')), [universo])
+  const grandes = useMemo(() => universo.filter((r) => r.bt_faixa === 'excluído (grande empresa)'), [universo])
+  const financ = useMemo(() => universo.filter((r) => r.bt_faixa === 'excluído (cedente financeiro)'), [universo])
   const calib = useMemo(() => dados.filter((r) => r.bt_rotulo), [dados])
   const linhas = aba === 'universo' ? dados : aba === 'calibracao' ? calib : bt
   const soma = (rs: Row[]) => rs.reduce((a, r) => a + (r.pl ?? 0), 0)
@@ -104,6 +106,8 @@ export default function Monocedentes() {
             <div className="c">{fmtValue(soma(universo.filter((r) => r.bt_faixa === 'possível')), 'brl')}</div></div>
           <div className="kpi"><div className="l">Estágios (prov. + poss.)</div>
             <div className="v">{est(1)} · {est(2)} · {est(3)}</div><div className="c">1 só sub · 2 sênior+sub · 3 distribuído</div></div>
+          <div className="kpi"><div className="l">Excluídos: cedente financeiro</div><div className="v">{financ.length}</div>
+            <div className="c">banco, SCD/bancarizadora, securitizadora, IP (CCB/nota comercial)</div></div>
           <div className="kpi"><div className="l">Excluídos: cedente grande empresa</div><div className="v">{grandes.length}</div>
             <div className="c">S.A. aberta ou capital ≥ R$ 1 bi (cativo, fornecedores...)</div></div>
           <div className="kpi"><div className="l">Calibração</div><div className="v">{acertos}/{calib.length}</div>
@@ -118,7 +122,11 @@ export default function Monocedentes() {
           <DataGrid rows={linhas} id={`mono-${aba}`} height={600} visoes={VISOES} exportUrl="/api/monocedentes?todos=true"
             cols={COLS.map((c) => c === 'nome' ? {
               field: 'nome', minWidth: 300, cellRenderer: (p: any) => (
-                <a href="#" onClick={(e) => { e.preventDefault(); set('fundo', p.data.cnpj) }} title="Ver sinais e cedentes">{p.value}</a>),
+                <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
+                  <button className="ghost" style={{ padding: '0 6px', minHeight: 24, fontSize: 12 }} title="Ver sinais, leitura do regulamento e cedentes"
+                    onClick={() => set('fundo', p.data.cnpj)}>sinais</button>
+                  <Link to={`/fundo/${p.data.cnpj}`} title="Abrir o fundo">{p.value}</Link>
+                </span>),
             } : c === 'bt_rotulo' ? {
               field: 'bt_rotulo', width: 120, valueFormatter: (p: any) =>
                 p.value === 'beneficio_tributario' ? 'benefício' : p.value === 'nao_beneficio' ? 'não é' : '',

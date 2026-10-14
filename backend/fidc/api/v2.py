@@ -383,7 +383,8 @@ def monocedentes(todos: bool = False, formato: str | None = None):
     filtro = "(m.monocedente OR f.categoria = 'monocedente_comercial')" if todos else "m.monocedente"
     d = df(f"""SELECT f.cnpj, f.nome, f.categoria_nome, f.gestor, f.admin, f.pl, m.bt_score, m.bt_faixa, m.bt_estagio,
                       m.bt_meses_estagio1, m.bt_inicio, m.bt_rotulo, m.mono_grupo, m.mono_grupo_cnpjs, m.mono_conc_grupo,
-                      m.mono_conc_carteira, m.mono_cedentes_informados, m.monocedente, me.nr_cotistas, r.estrutura,
+                      m.mono_conc_carteira, m.mono_cedentes_informados, m.monocedente, m.mono_grupo_cnae,
+                      m.mono_grupo_atividade, me.nr_cotistas, r.estrutura,
                       r.cotistas_senior, r.cotistas_subordinada, r.taxa_gestao, r.taxa_administracao, r.spread_senior_aa,
                       r.rentab_subordinada_12m_pct_cdi, r.taxa_desconto_aa, me.subordinacao, me.inad_90, me.pdd_carteira,
                       m.bt_nome_cedente, m.bt_sinais, m.bt_ia_sub, m.bt_ia_sub_nome, m.bt_ia_coobrigacao, m.bt_ia_indicio,

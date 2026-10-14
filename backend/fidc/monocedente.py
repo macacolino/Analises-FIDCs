@@ -20,9 +20,11 @@ Sinais (pontos):
 - nome do fundo aparece no cedente ou nos sócios do cedente: +10 (nem sempre: às vezes a ideia é distanciar)
 - fundo exclusivo: +5
 - regulamento (leitura IA, fidc.mono_ia): subordinada do cedente ou do grupo/acionistas +20; de investidores de
-  mercado -10; fundo restrito a um cotista/grupo +5; indício lido alto +10, baixo -10
+  fundo restrito a um cotista/grupo +5; indício lido alto +10. A leitura só soma: regulamento genérico (sub de
+  terceiros, vários cedentes) é comum em estruturas que querem distanciar a empresa do fundo.
 Faixas: >= 45 provável; 30-44 possível; < 30 improvável. Cedente grande empresa (S.A. aberta ou capital social
->= R$ 1 bi) fica fora por ora: "excluído (grande empresa)" - pode ser FIDC cativo, antecipação a fornecedores etc.
+>= R$ 1 bi) fica fora por ora; cedente instituição financeira/bancarizadora (CNAE 64 exceto holdings, ou nome de
+banco/SCD/securitizadora/IP) também: "excluído (cedente financeiro)" - fundo de CCB/nota comercial: "excluído (grande empresa)" - pode ser FIDC cativo, antecipação a fornecedores etc.
 """
 from __future__ import annotations
 
@@ -73,11 +75,28 @@ def _cadastro() -> dict[str, dict]:
         return {}
     con = sqlite3.connect(db)
     out = {}
-    for c, rs, nf, soc, nat, cap in con.execute("SELECT cnpj, razao_social, nome_fantasia, socios, natureza, "
-                                                "capital_social FROM cedente_info WHERE erro IS NULL"):
-        out[c] = {"razao": rs, "fantasia": nf, "natureza": nat, "capital": cap,
+    for c, rs, nf, soc, nat, cap, cnae, ativ in con.execute(
+            "SELECT cnpj, razao_social, nome_fantasia, socios, natureza, capital_social, cnae, cnae_desc "
+            "FROM cedente_info WHERE erro IS NULL"):
+        out[c] = {"razao": rs, "fantasia": nf, "natureza": nat, "capital": cap, "cnae": cnae, "atividade": ativ,
                   "socios": [s.get("nome") for s in json.loads(soc or "[]") if s.get("nome")]}
     return out
+
+
+_FIN_NOME = re.compile(r"SOCIEDADE DE CREDITO DIRETO|\bSCD\b|\bBANCO\b|INSTITUICAO DE PAGAMENTO|SECURITIZADORA|"
+                       r"EMPRESTIMO ENTRE PESSOAS|CREDITO,? FINANCIAMENTO|DISTRIBUIDORA DE TITULOS|CORRETORA DE")
+
+
+def financeiro(c: dict) -> str | None:
+    """Cedente instituição financeira/bancarizadora (banco, SCD, SEP, financeira, securitizadora, IP): o fundo é de
+    CCB/nota comercial ou de originação de terceiros, não de benefício tributário. CNAE 64, exceto holdings
+    (6461-6463: holding do grupo da empresa é justamente o caso que interessa)."""
+    cnae = re.sub(r"\D", "", c.get("cnae") or "")
+    if cnae[:2] == "64" and cnae[:4] not in ("6461", "6462", "6463"):
+        return f"CNAE {c.get('cnae')} ({c.get('atividade')})"
+    if _FIN_NOME.search(_norm(c.get("razao"))):
+        return "razão social de instituição financeira"
+    return None
 
 
 def _grupos(cedentes: list[tuple[str, float]], cad: dict) -> list[dict]:
@@ -111,7 +130,9 @@ def _grupos(cedentes: list[tuple[str, float]], cad: dict) -> list[dict]:
     for idx in g.values():
         docs = [cedentes[i][0] for i in idx]
         nome = next((cad[d]["razao"] for d in docs if d in cad and cad[d].get("razao")), None)
-        out.append({"docs": docs, "pct": sum(cedentes[i][1] for i in idx), "nome": nome})
+        c0 = next((cad[d] for d in docs if d in cad), {})
+        out.append({"docs": docs, "pct": sum(cedentes[i][1] for i in idx), "nome": nome,
+                    "cnae": c0.get("cnae"), "atividade": c0.get("atividade")})
     return sorted(out, key=lambda x: -x["pct"])
 
 
@@ -183,6 +204,7 @@ def build_table(con) -> None:
         for i, g in enumerate(gs):
             grupos_out.append({"cnpj": f.cnpj, "ordem": i + 1, "grupo": g["nome"], "cnpjs": ", ".join(g["docs"]),
                                "n_cnpjs": len(g["docs"]), "pct_carteira": g["pct"] / 100,
+                               "cnae": g["cnae"], "atividade": g["atividade"],
                                "pct_informados": g["pct"] / tot if tot else None})
         m1, mt, ini = hist.get(f.cnpj, (0, 0, None))
         cot = f.nr_cotistas if f.nr_cotistas == f.nr_cotistas else None
@@ -195,9 +217,10 @@ def build_table(con) -> None:
                 alvo |= set(_tokens(t))
         nome_bate = sorted(tok_f & alvo)
 
-        grande = None
+        grande = fin = None
         for d in (g1["docs"] if g1 else []):
             c = cad.get(d, {})
+            fin = fin or financeiro(c) and f"{c.get('razao')}: {financeiro(c)}"
             if "ABERTA" in _norm(c.get("natureza")):
                 grande = f"{c.get('razao')}: S.A. aberta"
             elif (c.get("capital") or 0) >= CAPITAL_GRANDE:
@@ -252,15 +275,13 @@ def build_table(con) -> None:
         sub = x.get("subordinada_subscritor")
         if sub in ("cedente", "acionistas_ou_grupo_do_cedente"):
             s(20, "regulamento: subordinada do " + ("cedente" if sub == "cedente" else "grupo/acionistas do cedente"))
-        elif sub == "terceiros_investidores":
-            s(-10, "regulamento: subordinada de investidores de mercado")
         if x.get("cotista_exclusivo_ou_grupo") is True and not (isinstance(f.exclusivo, str) and f.exclusivo.upper().startswith("S")):
             s(5, "regulamento: fundo restrito a um cotista/grupo")
         ind = x.get("indicio_beneficio_tributario")
         if ind == "alto":
             s(10, "leitura do regulamento: indício alto")
-        elif ind == "baixo":
-            s(-10, "leitura do regulamento: indício baixo")
+        # indício "baixo" não tira ponto: regulamento genérico é comum justamente para distanciar a empresa do fundo
+        # (Fiducia e JPA Agro, confirmados pelo time, foram lidos como "baixo")
 
         estrutura = f.estrutura
         if cot is not None and estrutura == "classe única" and cot <= 5:
@@ -272,7 +293,10 @@ def build_table(con) -> None:
         else:
             estagio = None
         faixa = "provável" if pts >= 45 else "possível" if pts >= 30 else "improvável"
-        if grande:
+        if fin:
+            faixa = "excluído (cedente financeiro)"
+            sinais.insert(0, "fora: cedente instituição financeira/bancarizadora (CCB/nota comercial) - " + fin)
+        elif grande:
             faixa = "excluído (grande empresa)"
             sinais.insert(0, "fora: cedente grande empresa - " + grande)
         r = rot.get(f.cnpj, {})
@@ -285,6 +309,7 @@ def build_table(con) -> None:
             "bt_meses_estagio1": m1, "bt_inicio": ini, "bt_estagio": estagio, "bt_score": pts, "bt_faixa": faixa,
             "bt_sinais": " | ".join(sinais), "bt_nome_cedente": ", ".join(nome_bate) or None,
             "bt_rotulo": r.get("rotulo"), "bt_rotulo_obs": r.get("obs"),
+            "mono_grupo_cnae": g1["cnae"] if g1 else None, "mono_grupo_atividade": g1["atividade"] if g1 else None,
             "bt_ia_sub": sub, "bt_ia_sub_nome": x.get("subordinada_subscritor_nome"),
             "bt_ia_coobrigacao": x.get("coobrigacao_cedente"), "bt_ia_indicio": ind,
             "bt_ia_justificativa": x.get("justificativa"), "bt_ia_trecho": x.get("trecho"), "bt_ia_pagina": x.get("pagina"),
@@ -294,7 +319,8 @@ def build_table(con) -> None:
     con.register("_m", df)
     con.execute("CREATE OR REPLACE TABLE mono_fundo AS SELECT * FROM _m")
     con.unregister("_m")
-    dg = pd.DataFrame(grupos_out, columns=["cnpj", "ordem", "grupo", "cnpjs", "n_cnpjs", "pct_carteira", "pct_informados"])
+    dg = pd.DataFrame(grupos_out, columns=["cnpj", "ordem", "grupo", "cnpjs", "n_cnpjs", "pct_carteira", "pct_informados",
+                                           "cnae", "atividade"])
     con.register("_g", dg)
     con.execute("CREATE OR REPLACE TABLE mono_grupo AS SELECT * FROM _g")
     con.unregister("_g")
