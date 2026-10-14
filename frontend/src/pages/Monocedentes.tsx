@@ -54,13 +54,14 @@ export default function Monocedentes() {
 
   const dados = q.data ?? []
   const universo = useMemo(() => dados.filter((r) => r.monocedente), [dados])
-  const bt = useMemo(() => universo.filter((r) => r.bt_faixa !== 'improvável'), [universo])
+  const bt = useMemo(() => universo.filter((r) => r.bt_faixa === 'provável' || r.bt_faixa === 'possível'), [universo])
+  const grandes = useMemo(() => universo.filter((r) => String(r.bt_faixa).startsWith('excluído')), [universo])
   const calib = useMemo(() => dados.filter((r) => r.bt_rotulo), [dados])
   const linhas = aba === 'universo' ? dados : aba === 'calibracao' ? calib : bt
   const soma = (rs: Row[]) => rs.reduce((a, r) => a + (r.pl ?? 0), 0)
   const est = (n: number) => bt.filter((r) => r.bt_estagio === n).length
   const atual = dados.find((r) => r.cnpj === sel)
-  const acertos = calib.filter((r) => (r.bt_rotulo === 'beneficio_tributario') === (!!r.monocedente && r.bt_faixa !== 'improvável')).length
+  const acertos = calib.filter((r) => (r.bt_rotulo === 'beneficio_tributario') === (!!r.monocedente && (r.bt_faixa === 'provável' || r.bt_faixa === 'possível'))).length
 
   return (
     <div className="stack">
@@ -89,6 +90,8 @@ export default function Monocedentes() {
             <div className="c">{fmtValue(soma(universo.filter((r) => r.bt_faixa === 'possível')), 'brl')}</div></div>
           <div className="kpi"><div className="l">Estágios (prov. + poss.)</div>
             <div className="v">{est(1)} · {est(2)} · {est(3)}</div><div className="c">1 só sub · 2 sênior+sub · 3 distribuído</div></div>
+          <div className="kpi"><div className="l">Excluídos: cedente grande empresa</div><div className="v">{grandes.length}</div>
+            <div className="c">S.A. aberta ou capital ≥ R$ 1 bi (cativo, fornecedores...)</div></div>
           <div className="kpi"><div className="l">Calibração</div><div className="v">{acertos}/{calib.length}</div>
             <div className="c">exemplos do time classificados certo</div></div>
         </div>

@@ -19,7 +19,8 @@ Sinais (pontos):
 - concentração no grupo: >= 95%: +10; 80-95%: +5; grupo com mais de um CNPJ (várias empresas do grupo): +5
 - nome do fundo aparece no cedente ou nos sócios do cedente: +10 (nem sempre: às vezes a ideia é distanciar)
 - fundo exclusivo: +5
-Faixas: >= 45 provável; 30-44 possível; < 30 improvável.
+Faixas: >= 45 provável; 30-44 possível; < 30 improvável. Cedente grande empresa (S.A. aberta ou capital social
+>= R$ 1 bi) fica fora por ora: "excluído (grande empresa)" - pode ser FIDC cativo, antecipação a fornecedores etc.
 """
 from __future__ import annotations
 
@@ -34,6 +35,8 @@ from . import config
 
 ROTULOS = Path(__file__).parent / "seed" / "mono_rotulos.json"
 CORTE_MONO = 0.80        # maior grupo / total dos cedentes informados
+CAPITAL_GRANDE = 1e9     # cedente com capital social >= R$ 1 bi ou S.A. aberta = "grande empresa": fica fora do
+                         # benefício tributário por ora (FIDC cativo, antecipação a fornecedores etc.; pedido do Allan)
 CORTE_CARTEIRA = 0.50    # e o maior grupo precisa ter pelo menos metade da carteira (fundo que informa um só cedente
                          # pequeno não vira monocedente)
 
@@ -68,9 +71,9 @@ def _cadastro() -> dict[str, dict]:
         return {}
     con = sqlite3.connect(db)
     out = {}
-    for c, rs, nf, soc in con.execute("SELECT cnpj, razao_social, nome_fantasia, socios FROM cedente_info "
-                                      "WHERE erro IS NULL"):
-        out[c] = {"razao": rs, "fantasia": nf,
+    for c, rs, nf, soc, nat, cap in con.execute("SELECT cnpj, razao_social, nome_fantasia, socios, natureza, "
+                                                "capital_social FROM cedente_info WHERE erro IS NULL"):
+        out[c] = {"razao": rs, "fantasia": nf, "natureza": nat, "capital": cap,
                   "socios": [s.get("nome") for s in json.loads(soc or "[]") if s.get("nome")]}
     return out
 
@@ -121,7 +124,7 @@ def prioridade() -> dict[str, int]:
     2 = categoria monocedente sem grupo fechado ainda. Quem não aparece fica depois."""
     from .db import df
     try:
-        u = df("""SELECT m.cnpj, CASE WHEN m.monocedente AND m.bt_faixa <> 'improvável' THEN 0 WHEN m.monocedente THEN 1
+        u = df("""SELECT m.cnpj, CASE WHEN m.monocedente AND m.bt_faixa IN ('provável', 'possível') THEN 0 WHEN m.monocedente THEN 1
                          ELSE 2 END AS k
                   FROM mono_fundo m JOIN fundo f USING (cnpj)
                   WHERE m.monocedente OR f.categoria = 'monocedente_comercial'""")
@@ -185,6 +188,15 @@ def build_table(con) -> None:
                 alvo |= set(_tokens(t))
         nome_bate = sorted(tok_f & alvo)
 
+        grande = None
+        for d in (g1["docs"] if g1 else []):
+            c = cad.get(d, {})
+            if "ABERTA" in _norm(c.get("natureza")):
+                grande = f"{c.get('razao')}: S.A. aberta"
+            elif (c.get("capital") or 0) >= CAPITAL_GRANDE:
+                grande = f"{c.get('razao')}: capital social R$ {c['capital'] / 1e9:,.1f} bi".replace(",", "X").replace(".", ",").replace("X", ".")
+            if grande:
+                break
         pts, sinais = 0, []
 
         def s(p, txt):
@@ -239,6 +251,9 @@ def build_table(con) -> None:
         else:
             estagio = None
         faixa = "provável" if pts >= 45 else "possível" if pts >= 30 else "improvável"
+        if grande:
+            faixa = "excluído (grande empresa)"
+            sinais.insert(0, "fora: cedente grande empresa - " + grande)
         r = rot.get(f.cnpj, {})
         linhas.append({
             "cnpj": f.cnpj, "mono_grupo": g1["nome"] if g1 else None,

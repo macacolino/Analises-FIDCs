@@ -31,14 +31,23 @@ SEED = Path(__file__).parent / "seed" / "cedentes.json.gz"
 SCHEMA = """CREATE TABLE IF NOT EXISTS cedente_info (
     cnpj TEXT PRIMARY KEY, raiz TEXT, razao_social TEXT, nome_fantasia TEXT, cnae TEXT, cnae_desc TEXT,
     uf TEXT, municipio TEXT, abertura TEXT, situacao TEXT, natureza TEXT, socios TEXT, fonte TEXT, consultado_em TEXT,
-    erro TEXT)"""
+    erro TEXT, capital_social REAL)"""
 INTERVALO = 21.0   # segundos entre consultas na mesma fonte (3/min)
 
 
 def db() -> sqlite3.Connection:
     con = sqlite3.connect(DB, timeout=60)
     con.execute(SCHEMA)
+    if "capital_social" not in {r[1] for r in con.execute("PRAGMA table_info(cedente_info)")}:
+        con.execute("ALTER TABLE cedente_info ADD COLUMN capital_social REAL")
     return con
+
+
+def _num(v) -> float | None:
+    try:
+        return float(str(v).replace(",", "")) if v not in (None, "") else None
+    except ValueError:
+        return None
 
 
 def _cnpjws(c: str, cli: httpx.Client) -> dict | None:
@@ -55,6 +64,7 @@ def _cnpjws(c: str, cli: httpx.Client) -> dict | None:
         "uf": (e.get("estado") or {}).get("sigla"), "municipio": (e.get("cidade") or {}).get("nome"),
         "abertura": e.get("data_inicio_atividade"), "situacao": e.get("situacao_cadastral"),
         "natureza": (d.get("natureza_juridica") or {}).get("descricao"),
+        "capital_social": _num(d.get("capital_social")),
         "socios": [{"nome": s.get("nome"), "doc": s.get("cpf_cnpj_socio"), "tipo": s.get("tipo"),
                     "qualificacao": (s.get("qualificacao_socio") or {}).get("descricao")} for s in d.get("socios") or []],
         "fonte": "publica.cnpj.ws",
@@ -75,6 +85,7 @@ def _receitaws(c: str, cli: httpx.Client) -> dict | None:
         "razao_social": d.get("nome"), "nome_fantasia": d.get("fantasia") or None,
         "cnae": ap.get("code"), "cnae_desc": ap.get("text"), "uf": d.get("uf"), "municipio": d.get("municipio"),
         "abertura": d.get("abertura"), "situacao": d.get("situacao"), "natureza": d.get("natureza_juridica"),
+        "capital_social": _num(d.get("capital_social")),
         "socios": [{"nome": s.get("nome"), "doc": None, "tipo": None, "qualificacao": s.get("qual")}
                    for s in d.get("qsa") or []],
         "fonte": "receitaws.com.br",
@@ -85,7 +96,8 @@ def fila(limite: int = 100000) -> list[str]:
     """CNPJs de cedentes ainda sem cadastro: primeiro os de fundos concentrados (maior grupo de CNPJ >= 25% dos
     cedentes informados), monocedente antes, por PL; depois o resto."""
     import duckdb
-    feitos = {r[0] for r in db().execute("SELECT cnpj FROM cedente_info WHERE erro IS NULL OR erro = 'não encontrado'")}
+    feitos = {r[0] for r in db().execute("SELECT cnpj FROM cedente_info WHERE erro = 'não encontrado' "
+                                         "OR (erro IS NULL AND capital_social IS NOT NULL)")}
     con = duckdb.connect(str(config.DB_PATH), read_only=True)
     linhas = con.execute("""
         WITH k AS (SELECT k.cnpj, k.cedente_doc, k.pct, f.categoria, f.pl FROM cedente_mes k
@@ -134,11 +146,11 @@ def buscar(limite: int = 100000, minutos: float | None = None) -> dict:
                     if "429" in str(e) or "Too Many" in str(e):
                         ultimo[f.__name__] = time.time() + 60   # castigo: 1 min a mais nessa fonte
                     continue
-                con.execute("INSERT OR REPLACE INTO cedente_info VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [
+                con.execute(f"INSERT OR REPLACE INTO cedente_info ({', '.join(COLS)}) VALUES ({', '.join('?' * len(COLS))})", [
                     c, c[:8], d.get("razao_social"), d.get("nome_fantasia"), d.get("cnae"), d.get("cnae_desc"),
                     d.get("uf"), d.get("municipio"), d.get("abertura"), d.get("situacao"), d.get("natureza"),
                     json.dumps(d.get("socios") or [], ensure_ascii=False), d.get("fonte"),
-                    datetime.now().isoformat(timespec="seconds"), d.get("erro")])
+                    datetime.now().isoformat(timespec="seconds"), d.get("erro"), d.get("capital_social")])
                 con.commit()
                 gravou = True
                 break
@@ -155,14 +167,14 @@ def importar_seed() -> int:
         return 0
     linhas = json.loads(gzip.decompress(SEED.read_bytes()))
     con = db()
-    con.executemany("INSERT OR IGNORE INTO cedente_info VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    con.executemany(f"INSERT OR IGNORE INTO cedente_info ({', '.join(COLS)}) VALUES ({', '.join('?' * len(COLS))})",
                     [[r.get(k) for k in COLS] for r in linhas])
     con.commit()
     return len(linhas)
 
 
 COLS = ["cnpj", "raiz", "razao_social", "nome_fantasia", "cnae", "cnae_desc", "uf", "municipio", "abertura",
-        "situacao", "natureza", "socios", "fonte", "consultado_em", "erro"]
+        "situacao", "natureza", "socios", "fonte", "consultado_em", "erro", "capital_social"]
 
 
 def exportar_seed() -> Path:
