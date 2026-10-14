@@ -71,7 +71,7 @@ export default function Monocedentes() {
   const universo = useMemo(() => dados.filter((r) => r.monocedente), [dados])
   const bt = useMemo(() => universo.filter((r) => r.bt_faixa === 'provável' || r.bt_faixa === 'possível'), [universo])
   const grandes = useMemo(() => universo.filter((r) => r.bt_faixa === 'excluído (grande empresa)'), [universo])
-  const financ = useMemo(() => universo.filter((r) => r.bt_faixa === 'excluído (cedente financeiro)'), [universo])
+  const financ = useMemo(() => universo.filter((r) => r.bt_faixa === 'excluído (cedente financeiro)' || r.bt_faixa === 'excluído (cedente público)'), [universo])
   const calib = useMemo(() => dados.filter((r) => r.bt_rotulo), [dados])
   const linhas = aba === 'universo' ? dados : aba === 'calibracao' ? calib : bt
   const soma = (rs: Row[]) => rs.reduce((a, r) => a + (r.pl ?? 0), 0)
@@ -106,8 +106,8 @@ export default function Monocedentes() {
             <div className="c">{fmtValue(soma(universo.filter((r) => r.bt_faixa === 'possível')), 'brl')}</div></div>
           <div className="kpi"><div className="l">Estágios (prov. + poss.)</div>
             <div className="v">{est(1)} · {est(2)} · {est(3)}</div><div className="c">1 só sub · 2 sênior+sub · 3 distribuído</div></div>
-          <div className="kpi"><div className="l">Excluídos: cedente financeiro</div><div className="v">{financ.length}</div>
-            <div className="c">banco, SCD/bancarizadora, securitizadora, IP (CCB/nota comercial)</div></div>
+          <div className="kpi"><div className="l">Excluídos: financeiro/pagamentos/público</div><div className="v">{financ.length}</div>
+            <div className="c">banco, SCD/bancarizadora, securitizadora, meios de pagamento, ente público</div></div>
           <div className="kpi"><div className="l">Excluídos: cedente grande empresa</div><div className="v">{grandes.length}</div>
             <div className="c">S.A. aberta ou capital ≥ R$ 1 bi (cativo, fornecedores...)</div></div>
           <div className="kpi"><div className="l">Calibração</div><div className="v">{acertos}/{calib.length}</div>

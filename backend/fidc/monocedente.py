@@ -99,6 +99,20 @@ def fundo_pagamento(nome: str | None, categoria: str | None) -> str | None:
     return f"nome do fundo: {m.group(0).lower()}" if m else None
 
 
+_PUB = re.compile(r"MUNICIPIO|ESTADO D[OAE] |AUTARQUIA|ADMINISTRACAO PUBLICA|ORGAO PUBLICO|FUNDACAO PUBLICA|PODER EXECUTIVO|"
+                  r"PREFEITURA|SECRETARIA")
+PUBLICAS = {"precatorios", "precatorios_federais", "setor_publico_outros", "judicial"}
+
+
+def publico(c: dict, categoria: str | None) -> str | None:
+    """Cedente ente público (município, estado, autarquia) ou fundo de créditos públicos/judiciais."""
+    if _PUB.search(_norm(c.get("natureza"))) or _PUB.search(_norm(c.get("razao"))):
+        return f"{c.get('razao')}: ente público"
+    if categoria in PUBLICAS:
+        return f"categoria {categoria}"
+    return None
+
+
 def financeiro(c: dict) -> str | None:
     """Cedente instituição financeira/bancarizadora (banco, SCD, SEP, financeira, securitizadora, IP): o fundo é de
     CCB/nota comercial ou de originação de terceiros, não de benefício tributário. CNAE 64, exceto holdings
@@ -229,9 +243,11 @@ def build_table(con) -> None:
                 alvo |= set(_tokens(t))
         nome_bate = sorted(tok_f & alvo)
 
-        grande = fin = None
+        grande = fin = pub = None
+        pub = publico({}, f.categoria)
         for d in (g1["docs"] if g1 else []):
             c = cad.get(d, {})
+            pub = pub or publico(c, None)
             fin = fin or financeiro(c) and f"{c.get('razao')}: {financeiro(c)}"
             if "ABERTA" in _norm(c.get("natureza")):
                 grande = f"{c.get('razao')}: S.A. aberta"
@@ -308,7 +324,10 @@ def build_table(con) -> None:
         pag = fundo_pagamento(f.nome, f.categoria)
         if pag and not fin:
             fin = "fundo de recebíveis de meios de pagamento/cartão (" + pag + ")"
-        if fin:
+        if pub:
+            faixa = "excluído (cedente público)"
+            sinais.insert(0, "fora: crédito público/judicial - " + pub)
+        elif fin:
             faixa = "excluído (cedente financeiro)"
             sinais.insert(0, "fora: cedente instituição financeira/bancarizadora (CCB/nota comercial) - " + fin)
         elif grande:
