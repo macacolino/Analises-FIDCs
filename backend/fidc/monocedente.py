@@ -87,6 +87,18 @@ _FIN_NOME = re.compile(r"SOCIEDADE DE CREDITO DIRETO|\bSCD\b|\bBANCO\b|INSTITUIC
                        r"EMPRESTIMO ENTRE PESSOAS|CREDITO,? FINANCIAMENTO|DISTRIBUIDORA DE TITULOS|CORRETORA DE")
 
 
+_PAGTO = re.compile(r"MEIOS? DE PAGAMENTO|CREDENCIADORA|UNIDADES? DE RECEBIVEIS|RECEBIVEIS DE CARTAO|ADQUIREN")
+
+
+def fundo_pagamento(nome: str | None, categoria: str | None) -> str | None:
+    """FIDC de recebíveis de cartão/meios de pagamento: funding de credenciadora/subadquirente/IP, não benefício
+    tributário (MDR II, SumUp, Iugu, CloudWalk...). Pelo nome do fundo ou pela categoria cartão."""
+    if categoria == "cartao":
+        return "categoria cartão"
+    m = _PAGTO.search(_norm(nome))
+    return f"nome do fundo: {m.group(0).lower()}" if m else None
+
+
 def financeiro(c: dict) -> str | None:
     """Cedente instituição financeira/bancarizadora (banco, SCD, SEP, financeira, securitizadora, IP): o fundo é de
     CCB/nota comercial ou de originação de terceiros, não de benefício tributário. CNAE 64, exceto holdings
@@ -293,6 +305,9 @@ def build_table(con) -> None:
         else:
             estagio = None
         faixa = "provável" if pts >= 45 else "possível" if pts >= 30 else "improvável"
+        pag = fundo_pagamento(f.nome, f.categoria)
+        if pag and not fin:
+            fin = "fundo de recebíveis de meios de pagamento/cartão (" + pag + ")"
         if fin:
             faixa = "excluído (cedente financeiro)"
             sinais.insert(0, "fora: cedente instituição financeira/bancarizadora (CCB/nota comercial) - " + fin)
