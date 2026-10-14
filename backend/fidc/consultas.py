@@ -68,7 +68,13 @@ def buscar(q: str = "", categoria: str | None = None, grupo: str | None = None,
                f.ultimo_informe, f.revisar, c.ia_diverge_informe, m.inad_90, m.pdd_carteira, m.subordinacao,
                m.rentab_senior, k.consultoria, k.agente_cobranca, m.nr_cotistas, r.pl_medio_12m, r.estrutura,
                r.cotistas_senior, r.cotistas_mezanino, r.cotistas_subordinada, r.taxa_desconto_aa,
-               r.taxa_administracao, r.taxa_gestao, r.sub_min_senior, r.spread_senior_aa, r.spread_mezanino_aa
+               r.taxa_administracao, r.taxa_gestao, r.sub_min_senior, r.spread_senior_aa, r.spread_mezanino_aa,
+               m.rentab_mezanino, m.rentab_subordinada, r.cdi_mes, r.rentab_senior_pct_cdi, r.rentab_mezanino_pct_cdi,
+               r.rentab_subordinada_pct_cdi, r.rentab_senior_12m, r.rentab_mezanino_12m, r.rentab_subordinada_12m,
+               r.cdi_12m, r.rentab_senior_12m_pct_cdi, r.rentab_mezanino_12m_pct_cdi, r.rentab_subordinada_12m_pct_cdi,
+               m.subordinacao_junior, m.inad_total, m.inad_360, m.cobertura_pdd_90, m.roll_30_60, m.roll_60_90,
+               m.top1_cedente_pct, m.top5_cedentes_pct, m.prazo_medio_dias, m.liquidez_30_pl, m.giro_mes,
+               m.aquisicoes, m.recompra_subst_3m_carteira, m.pl_var_mes
         FROM fundo f LEFT JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
         LEFT JOIN classificacao c ON c.cnpj = f.cnpj
         LEFT JOIN consultoria_fundo k ON k.cnpj = f.cnpj

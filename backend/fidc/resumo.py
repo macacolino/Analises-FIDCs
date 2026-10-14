@@ -7,6 +7,7 @@ fundo_resumo (último informe de cada fundo):
 - taxa_administracao / taxa_gestao / sub_min_senior: regulamento (regras + IA);
 - estrutura: "classes" (sênior/mezanino/subordinada) ou "classe única" (sem subordinação a medir);
 - rentab_*_12m e cdi_12m: rentabilidade composta em 12 meses (só com 12 meses informados e sem mês implausível);
+  rentab_*_pct_cdi (último mês) e rentab_*_12m_pct_cdi: a mesma rentabilidade como % do CDI do período;
   spread_*_aa: "CDI + x% a.a." estimado pelo excesso mensal MEDIANO sobre o CDI nos últimos 12 meses (>= 6 meses com cota andando),
   anualizado - a mediana ignora os meses de amortização, em que a cota cai sem perda e a rentabilidade informada
   sai negativa. É estimativa da remuneração efetiva, não o benchmark do regulamento.
@@ -40,6 +41,8 @@ def build_table(con) -> None:
                    count(m.rentab_senior) AS n_sr, max(abs(m.rentab_senior)) AS max_sr,
                    exp(sum(ln(1 + m.rentab_mezanino / 100))) - 1 AS rentab_mezanino_12m,
                    count(m.rentab_mezanino) AS n_mz, max(abs(m.rentab_mezanino)) AS max_mz,
+                   exp(sum(ln(1 + m.rentab_subordinada / 100))) - 1 AS rentab_subordinada_12m,
+                   count(m.rentab_subordinada) AS n_sb, max(abs(m.rentab_subordinada)) AS max_sb,
                    exp(sum(ln(1 + c.cdi_mes))) - 1 AS cdi_12m,
                    -- excesso mensal mediano sobre o CDI: robusto a meses de amortização (cota cai sem perda)
                    -- (meses com rentabilidade exatamente zero = cota parada/série encerrada, fora)
@@ -50,6 +53,7 @@ def build_table(con) -> None:
             FROM metricas_mes m JOIN ult u ON u.cnpj = m.cnpj AND m.dt > u.dt - INTERVAL 12 MONTH AND m.dt <= u.dt
             JOIN cdi_mes c ON c.dt = m.dt
             WHERE coalesce(m.rentab_senior, 0) > -99 AND coalesce(m.rentab_mezanino, 0) > -99
+              AND coalesce(m.rentab_subordinada, 0) > -99
             GROUP BY m.cnpj),
         reg AS (
             SELECT cnpj,
@@ -64,7 +68,15 @@ def build_table(con) -> None:
                CASE WHEN m.n_series > 1 THEN 'classes' WHEN m.n_series = 1 THEN 'classe única' END AS estrutura,
                CASE WHEN r.n = 12 AND r.n_sr = 12 AND r.max_sr <= 15 THEN r.rentab_senior_12m END AS rentab_senior_12m,
                CASE WHEN r.n = 12 AND r.n_mz = 12 AND r.max_mz <= 15 THEN r.rentab_mezanino_12m END AS rentab_mezanino_12m,
+               -- subordinada oscila mais: aceita até 30% num mês antes de considerar o dado implausível
+               CASE WHEN r.n = 12 AND r.n_sb = 12 AND r.max_sb <= 30 AND m.n_series > 1 THEN r.rentab_subordinada_12m END
+                   AS rentab_subordinada_12m,
                CASE WHEN r.n = 12 THEN r.cdi_12m END AS cdi_12m,
+               cm.cdi_mes,
+               -- % do CDI do último mês (rentabilidade informada / CDI do mês); só com CDI do mês positivo
+               CASE WHEN cm.cdi_mes > 0 THEN m.rentab_senior / 100 / cm.cdi_mes END AS rentab_senior_pct_cdi,
+               CASE WHEN cm.cdi_mes > 0 THEN m.rentab_mezanino / 100 / cm.cdi_mes END AS rentab_mezanino_pct_cdi,
+               CASE WHEN cm.cdi_mes > 0 THEN m.rentab_subordinada / 100 / cm.cdi_mes END AS rentab_subordinada_pct_cdi,
                -- só com sênior de verdade (mais de uma classe): na classe única o rótulo "sênior" é a cota toda
                CASE WHEN r.n_sr_ok >= 6 AND m.n_series > 1 THEN r.exc_sr END AS exc_sr,
                CASE WHEN r.n_mz_ok >= 6 AND m.n_series > 1 THEN r.exc_mz END AS exc_mz
@@ -72,12 +84,19 @@ def build_table(con) -> None:
         LEFT JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
         LEFT JOIN pl12 p ON p.cnpj = f.cnpj LEFT JOIN cot c ON c.cnpj = f.cnpj
         LEFT JOIN casa_mes k ON k.cnpj = f.cnpj AND k.dt = f.ultimo_informe
-        LEFT JOIN r12 r ON r.cnpj = f.cnpj LEFT JOIN reg g ON g.cnpj = f.cnpj""")
+        LEFT JOIN r12 r ON r.cnpj = f.cnpj LEFT JOIN reg g ON g.cnpj = f.cnpj
+        LEFT JOIN cdi_mes cm ON cm.dt = f.ultimo_informe""")
     con.execute("""
         ALTER TABLE fundo_resumo ADD COLUMN spread_senior_aa DOUBLE;
         ALTER TABLE fundo_resumo ADD COLUMN spread_mezanino_aa DOUBLE;
         UPDATE fundo_resumo SET spread_senior_aa = (1 + exc_sr) ^ 12 - 1, spread_mezanino_aa = (1 + exc_mz) ^ 12 - 1;
-        ALTER TABLE fundo_resumo DROP COLUMN exc_sr; ALTER TABLE fundo_resumo DROP COLUMN exc_mz""")
+        ALTER TABLE fundo_resumo DROP COLUMN exc_sr; ALTER TABLE fundo_resumo DROP COLUMN exc_mz;
+        ALTER TABLE fundo_resumo ADD COLUMN rentab_senior_12m_pct_cdi DOUBLE;
+        ALTER TABLE fundo_resumo ADD COLUMN rentab_mezanino_12m_pct_cdi DOUBLE;
+        ALTER TABLE fundo_resumo ADD COLUMN rentab_subordinada_12m_pct_cdi DOUBLE;
+        UPDATE fundo_resumo SET rentab_senior_12m_pct_cdi = rentab_senior_12m / nullif(cdi_12m, 0),
+                                rentab_mezanino_12m_pct_cdi = rentab_mezanino_12m / nullif(cdi_12m, 0),
+                                rentab_subordinada_12m_pct_cdi = rentab_subordinada_12m / nullif(cdi_12m, 0)""")
     for nome, col in (("gestor_resumo", "gestor"), ("admin_resumo", "admin")):
         con.execute(f"""
             CREATE OR REPLACE TABLE {nome} AS

@@ -1,7 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useApi, useTaxonomia, type Row } from '../api'
-import { DataGrid } from '../components/DataGrid'
+import { DataGrid, type Visao } from '../components/DataGrid'
+import { Dispersao } from '../components/Dispersao'
+
+// conjuntos de colunas por pergunta de análise (o resto continua disponível em "Colunas")
+const VISOES: Visao[] = [
+  { nome: 'Geral', cols: ['categoria_nome', 'gestor', 'admin', 'pl', 'estrutura', 'subordinacao', 'inad_90',
+    'pdd_carteira', 'taxa_gestao', 'spread_senior_aa', 'rentab_senior_12m_pct_cdi'] },
+  { nome: 'Crédito', cols: ['categoria_nome', 'pl', 'inad_90', 'inad_360', 'pdd_carteira', 'cobertura_pdd_90',
+    'roll_30_60', 'roll_60_90', 'recompra_subst_3m_carteira', 'taxa_desconto_aa', 'prazo_medio_dias'] },
+  { nome: 'Rentabilidade', cols: ['categoria_nome', 'pl', 'estrutura', 'rentab_senior', 'rentab_senior_pct_cdi',
+    'rentab_senior_12m', 'rentab_senior_12m_pct_cdi', 'spread_senior_aa', 'rentab_mezanino_12m_pct_cdi',
+    'spread_mezanino_aa', 'rentab_subordinada', 'rentab_subordinada_12m', 'rentab_subordinada_12m_pct_cdi'] },
+  { nome: 'Estrutura e custos', cols: ['pl', 'pl_medio_12m', 'estrutura', 'subordinacao', 'sub_min_senior',
+    'subordinacao_junior', 'taxa_administracao', 'taxa_gestao', 'cotistas_senior', 'cotistas_mezanino',
+    'cotistas_subordinada', 'nr_cotistas'] },
+  { nome: 'Concentração', cols: ['categoria_nome', 'pl', 'top1_cedente_pct', 'top5_cedentes_pct', 'giro_mes',
+    'aquisicoes', 'liquidez_30_pl', 'prazo_medio_dias'] },
+  { nome: 'Prestadores', cols: ['categoria_nome', 'gestor', 'admin', 'consultoria', 'agente_cobranca', 'pl'] },
+]
 
 // faixas numéricas: campo, rótulo, escala da tela (pct = fração x100; brl = R$ em milhões)
 const FAIXAS: [string, string, 'pct' | 'brl' | 'num'][] = [
@@ -37,6 +55,7 @@ export default function Pesquisa() {
   const [faixa, setFaixa] = useState<Record<string, { min: string; max: string }>>({})
   const [estrutura, setEstrutura] = useState('')
   const [abrir, setAbrir] = useState(false)
+  const modo = sp.get('ver') === 'grafico' ? 'grafico' : 'tabela'
   const extremos = faixa.pl?.min === EXTREMOS.min && faixa.pl?.max === EXTREMOS.max
   const setF = (k: string, lado: 'min' | 'max', v: string) =>
     setFaixa((f) => ({ ...f, [k]: { min: f[k]?.min ?? '', max: f[k]?.max ?? '', [lado]: v } }))
@@ -118,17 +137,24 @@ export default function Pesquisa() {
           Subordinação vazia = fundo de classe única (não há subordinação a medir).
         </div>
       </div>
+      <div className="row" style={{ gap: 4 }}>
+        <button className={modo === 'tabela' ? 'primary' : ''} onClick={() => set('ver', '')}>Tabela</button>
+        <button className={modo === 'grafico' ? 'primary' : ''} onClick={() => set('ver', 'grafico')}>Gráfico (dispersão)</button>
+      </div>
+      {modo === 'grafico' ? (
+        <div className="card"><Dispersao rows={linhas} campos={Object.keys(res.data?.[0] ?? {})} /></div>
+      ) : (
       <div className="card">
-        <DataGrid rows={linhas} exportUrl={url} height={620}
-          cols={['nome', 'cnpj', 'categoria_nome', 'gestor', 'admin', 'consultoria', 'pl', 'pl_medio_12m', 'estrutura',
+        <DataGrid rows={linhas} exportUrl={url} height={620} id="pesquisa" visoes={VISOES}
+          cols={['nome', 'cnpj', 'categoria_nome', 'gestor', 'admin', 'consultoria', 'pl', 'estrutura',
                  'subordinacao', 'sub_min_senior', 'inad_90', 'pdd_carteira', 'taxa_administracao', 'taxa_gestao',
-                 'taxa_desconto_aa', 'spread_senior_aa', 'spread_mezanino_aa', 'cotistas_senior', 'cotistas_mezanino',
-                 'cotistas_subordinada', 'nr_cotistas', 'ultimo_informe',
+                 'spread_senior_aa', 'rentab_senior_12m_pct_cdi', 'ultimo_informe',
                  { field: 'revisar', valueFormatter: (p: any) => (p.value ? 'revisar' : ''), width: 90 },
                  { field: 'ia_diverge_informe', headerName: 'Regulamento x carteira', width: 130,
                    headerTooltip: 'A tese lida no regulamento não bate com a carteira declarada no informe CVM (Tab. II)',
                    valueFormatter: (p: any) => (p.value ? 'diverge' : '') }]} />
       </div>
+      )}
     </div>
   )
 }
