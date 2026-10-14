@@ -383,12 +383,12 @@ def mesclar_taxas(linhas: list[str]) -> dict:
     benchmark da sênior se faltava e marca `taxas_releitura`. Mantém data e origem da leitura original."""
     from datetime import date
     con = ag.db()
+    con.execute("CREATE TABLE IF NOT EXISTS reg_taxas_avulsa (cnpj TEXT PRIMARY KEY, resultado TEXT, processado_em TEXT)")
     n = com_taxa = 0
     for l in linhas:
         j = json.loads(l)
         row = con.execute("SELECT resultado FROM reg_ia WHERE cnpj = ?", [j["cnpj"]]).fetchone()
         if not row:     # sem leitura completa: guarda à parte, o fundo segue na fila da leitura completa
-            con_avulsa()
             con.execute("INSERT OR REPLACE INTO reg_taxas_avulsa VALUES (?,?,?)",
                         [j["cnpj"], json.dumps(j["resultado"], ensure_ascii=False), date.today().isoformat()])
             n += 1
