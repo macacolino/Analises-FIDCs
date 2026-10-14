@@ -207,7 +207,8 @@ def fila(limite: int) -> list[tuple[str, str]]:
     con.close()
     u = df("""SELECT f.cnpj, f.nome, f.pl FROM fundo f JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
               WHERE f.ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH AND m.dc_bruto > 0""")
-    u = u[~u.cnpj.isin(lidos | sem)].sort_values("pl", ascending=False).head(limite)
+    from . import monocedente
+    u = monocedente.ordenar(u[~u.cnpj.isin(lidos | sem)], limite)   # monocedentes na frente (foco atual)
     return list(zip(u.cnpj, u.nome))
 
 

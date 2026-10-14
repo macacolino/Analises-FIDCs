@@ -193,7 +193,8 @@ def fila(limite: int) -> list[tuple[str, str]]:
     if not pend:
         return []
     u = df("SELECT cnpj, nome, pl FROM fundo WHERE cnpj IN (SELECT unnest(?))", [pend])
-    u = u.sort_values("pl", ascending=False, na_position="last").head(limite)
+    from . import monocedente
+    u = monocedente.ordenar(u, limite)   # monocedentes na frente (foco atual)
     return list(zip(u.cnpj, u.nome))
 
 

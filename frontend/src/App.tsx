@@ -5,6 +5,7 @@ import Feedback from './components/Feedback'
 import FundPicker from './components/FundPicker'
 import { Icone } from './components/Icones'
 import Casas from './pages/Casas'
+import Monocedentes from './pages/Monocedentes'
 import Comparar from './pages/Comparar'
 import Consultorias from './pages/Consultorias'
 import Fundo from './pages/Fundo'
@@ -38,6 +39,8 @@ export default function App() {
           <span>Analisador de FIDCs</span>
         </div>
         <nav>
+          <div className="grp">Foco</div>
+          <Item to="/monocedentes" icone="monocedente">Monocedentes</Item>
           <div className="grp">Mercado</div>
           <Item to="/" icone="mercado">Visão geral</Item>
           <Item to="/oportunidades" icone="oportunidades">Oportunidades</Item>
@@ -78,6 +81,7 @@ export default function App() {
           <Route path="/pdd" element={<Pdd />} />
           <Route path="/consultorias" element={<Consultorias />} />
           <Route path="/casas" element={<Casas />} />
+          <Route path="/monocedentes" element={<Monocedentes />} />
           <Route path="/glossario" element={<Glossario />} />
           <Route path="/fundo/:cnpj" element={<Fundo />} />
           <Route path="/carteira" element={<Lista tipo="carteira" />} />

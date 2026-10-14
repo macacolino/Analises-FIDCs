@@ -16,6 +16,7 @@ import re
 from pathlib import Path
 
 from . import agente_regulamento as ag
+from . import monocedente
 from . import regulamentos as rg
 
 GRAVAR = r'''"""Uso: python3 gravar.py NN arquivo.json  -> valida contra spec.json e grava em out/parte_NN.jsonl (com trava)."""
@@ -157,7 +158,7 @@ def fila_taxas(limite: int, todos: bool = False) -> list[tuple[str, str]]:
         u = u[u.cnpj.map(pendente)]
     prio = {"precatorios_federais": 0, "precatorios": 0, "judicial": 1, "setor_publico_outros": 1}
     u["k"] = u.categoria.map(prio).fillna(2)
-    u = u.sort_values(["k", "pl"], ascending=[True, False]).head(limite)
+    u = monocedente.ordenar(u, limite)   # monocedentes na frente (foco atual)
     return list(zip(u.cnpj, u.nome))
 
 
@@ -245,7 +246,7 @@ def fila(limite: int) -> list[tuple[str, str]]:
         u["pend"] = u.cnpj.isin(medios)
     u = u[u.pend]
     u["k"] = u.categoria.map(prio).fillna(9)
-    u = u.sort_values(["k", "pl"], ascending=[True, False]).head(limite)
+    u = monocedente.ordenar(u, limite)   # monocedentes na frente (foco atual)
     return list(zip(u.cnpj, u.nome))
 
 

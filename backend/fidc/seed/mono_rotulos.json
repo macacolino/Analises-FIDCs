@@ -1,0 +1,308 @@
+[
+ {
+  "cnpj": "63915937000107",
+  "rotulo": "beneficio_tributario",
+  "obs": "GP7",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "53018439000108",
+  "rotulo": "beneficio_tributario",
+  "obs": "Diamante (assumido: o da Somma; há outros \"Diamante\")",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "63735087000165",
+  "rotulo": "beneficio_tributario",
+  "obs": "Callis",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "57213448000100",
+  "rotulo": "beneficio_tributario",
+  "obs": "Missões",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "62966067000132",
+  "rotulo": "beneficio_tributario",
+  "obs": "Fiducia",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "56056018000160",
+  "rotulo": "beneficio_tributario",
+  "obs": "Vetro",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "63938508000155",
+  "rotulo": "beneficio_tributario",
+  "obs": "Ápia",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "47669200000103",
+  "rotulo": "beneficio_tributario",
+  "obs": "Fert-Agro",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "54008688000185",
+  "rotulo": "beneficio_tributario",
+  "obs": "Marajó",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "57088975000130",
+  "rotulo": "nao_beneficio",
+  "obs": "Monte Sião",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "61430639000100",
+  "rotulo": "nao_beneficio",
+  "obs": "NX Boats",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "35449141000170",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA NPL I FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS ",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "56265097000119",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ JUS II FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "43721652000128",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): TELCOBANK I FUNDO DE INVESTIMENTO  EM DIREITOS CREDITÓRIOS R",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "57584003000137",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): CACO3 II FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS DE RE",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "45880888000132",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS PRODUÇÃO I",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "58036896000149",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ JUS III FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS -",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "42605393000107",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS QUASAR DUCOCO",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "61085925000177",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS VI.2 FUNDO DE INVESTIMENTO EM DIR",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "53311084000140",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS IV FUNDO DE INVESTIMENTO EM DIREI",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "53908929000180",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS V FUNDO DE INVESTIMENTO EM DIREIT",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "56154338000152",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): KUARÁ ORIZ LSN I FUNDO DE INVESTIMENTOS EM DIREITOS CREDITÓR",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "57300010000160",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: LB I FUNDO  DE INVESTIMENTO EM DIREITOS CREDITÓRIOS RESPONSA",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "66279914000141",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ JURI LC II FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIO",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "52155823000190",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA NPL & SPECIAL OPPORTUNITIES II FUNDO DE INVESTIMENTO",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "58423669000176",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA  ALTERNATIVE ASSETS XI FUNDO DE INVESTIMENTO EM DIRE",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "55808689000177",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS IX FUNDO DE INVESTIMENTO EM DIREI",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "57752597000148",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): AGROMERCANTIL CRÉDITO AGRO FUNDO DE INVESTIMENTO EM DIREITOS",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "61543748000125",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ JUS CPS FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS -",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "61709339000156",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): FIDC MDR II HIGH GRADE RECEBÍVEIS DE CREDENCIADORAS RESPONSA",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "63863686000164",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ JURI LC FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS -",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "52997572000190",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ JUS I FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "61085704000107",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS XII SR FUNDO DE INVESTIMENTO EM C",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "46082740000115",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): MUNDIAL  FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "51017188000111",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS III FUNDO DE INVESTIMENTO EM DIRE",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "63503400000130",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS XIII FUNDO DE INVESTIMENTO EM DIR",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "67871633000146",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS XVIII FUNDO DE INVESTIMENTO EM DI",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "67223502000152",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS XVII FUNDO DE INVESTIMENTO EM DIR",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "59550943000130",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ JUS IV FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS RE",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "62125959000100",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS TELCO EQUITY R",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "67806693000185",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS VI.3 FUNDO DE INVESTIMENTO EM DIR",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "53908944000128",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS VI FUNDO DE INVESTIMENTO EM DIREI",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "61177258000152",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): JPA AGRO I FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS DE ",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "61631300000163",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ JUS V FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS - R",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "67220127000197",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ JURI LSN IV FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRI",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "41593704000100",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: INDÚSTRIA Q1 FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "54679234000136",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS VII FUNDO DE INVESTIMENTO EM DIRE",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "54875483000105",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS VIII FUNDO DE INVESTIMENTO EM DIR",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "56264671000114",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ ALBRIGHT FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS ",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "56659005000185",
+  "rotulo": "nao_beneficio",
+  "obs": "Chimera: CHIMERA ALTERNATIVE ASSETS X FUNDO DE INVESTIMENTO EM DIREIT",
+  "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "66790195000129",
+  "rotulo": "nao_beneficio",
+  "obs": "Oriz (gestora inteira; confirmar): ORIZ JURI LSN III FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓR",
+  "fonte": "Allan, 14/10/2026"
+ }
+]

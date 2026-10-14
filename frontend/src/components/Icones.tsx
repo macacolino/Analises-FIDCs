@@ -14,5 +14,6 @@ export const Icone = {
   casas: () => <svg {...base}><path d="M3 21h18" /><path d="M5 21V8l7-4 7 4v13" /><path d="M9 21v-6h6v6" /><path d="M9 10h.01M15 10h.01" /></svg>,
   consultoria: () => <svg {...base}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7" /><path d="M18 14c2 .6 3 2.6 3 6" /></svg>,
   pdd: () => <svg {...base}><path d="M12 3v18" /><path d="M5 8h11a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h11" /></svg>,
+  monocedente: () => <svg {...base}><circle cx="12" cy="7" r="3" /><path d="M12 10v4" /><path d="M5 21v-3a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v3" /></svg>,
   glossario: () => <svg {...base}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z" /><path d="M20 17v4H6.5A2.5 2.5 0 0 1 4 18.5" /></svg>,
 }

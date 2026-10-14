@@ -1,0 +1,267 @@
+"""Monocedentes e estruturas de benefício tributário.
+
+1. Grupo do cedente: dentro de cada fundo, junta os CNPJs dos 9 maiores cedentes (Tab. I) que são do mesmo grupo
+   econômico: mesma raiz de CNPJ, sócio em comum ou mesmo primeiro nome na razão social (cadastro da Receita em
+   fidc.cedentes). Concentração = participação do maior grupo no total dos cedentes informados.
+   Universo "monocedente": maior grupo >= 80% dos cedentes informados e >= 50% da carteira (corte inicial,
+   calibrado com os exemplos).
+
+2. Benefício tributário: a empresa cede recebíveis ao FIDC e os acionistas, como cotistas da subordinada, ficam com
+   o ganho. Estágios: 1 = só subordinada e poucos cotistas; 2 = sênior + sub, ainda poucos cotistas; 3 = distribuído
+   a mercado (muitos cotistas/séries) - nesse caso o histórico (quanto tempo ficou no estágio 1) é o que denuncia.
+   Score por pontos, transparente (cada sinal aparece na tela). Nenhum sinal é regra: são indícios que se somam.
+
+Sinais (pontos):
+- histórico: meses só com subordinada e <= 3 cotistas (>= 6: +20; 3-5: +10)
+- cotistas hoje: <= 3: +15; <= 10: +10; <= 30: +3
+- taxa de gestão: <= 0,5% a.a.: +15; <= 1%: +5; > 1%: -20 (produto vendido a mercado cobra mais)
+- remuneração da sênior: <= CDI + 4,5%: +5; > CDI + 5,5%: -10
+- concentração no grupo: >= 95%: +10; 80-95%: +5; grupo com mais de um CNPJ (várias empresas do grupo): +5
+- nome do fundo aparece no cedente ou nos sócios do cedente: +10 (nem sempre: às vezes a ideia é distanciar)
+- fundo exclusivo: +5
+Faixas: >= 45 provável; 30-44 possível; < 30 improvável.
+"""
+from __future__ import annotations
+
+import json
+import re
+import sqlite3
+import unicodedata
+from collections import defaultdict
+from pathlib import Path
+
+from . import config
+
+ROTULOS = Path(__file__).parent / "seed" / "mono_rotulos.json"
+CORTE_MONO = 0.80        # maior grupo / total dos cedentes informados
+CORTE_CARTEIRA = 0.50    # e o maior grupo precisa ter pelo menos metade da carteira (fundo que informa um só cedente
+                         # pequeno não vira monocedente)
+
+# palavras que não identificam empresa nem fundo
+GENERICAS = set("""
+FUNDO FUNDOS INVESTIMENTO INVESTIMENTOS DIREITOS CREDITORIOS CREDITORIO FIDC FIC RESPONSABILIDADE LIMITADA LTDA
+CLASSE UNICA FECHADA ABERTA SEGMENTO FINANCEIRO FINANCEIRA COMERCIAL COMERCIAIS CREDITO RECEBIVEIS NAO PADRONIZADOS
+PADRONIZADO MULTISSETORIAL MULTICARTEIRA SENIOR SUBORDINADA MEZANINO RESP LIM DE DA DO DOS DAS E EM PARA COM
+SA S A ME EPP EIRELI COMERCIO INDUSTRIA INDUSTRIAL DISTRIBUIDORA DISTRIBUIDOR SERVICOS SERVICO PARTICIPACOES
+PARTICIPACAO EMPREENDIMENTOS ADMINISTRACAO GESTAO HOLDING GRUPO BRASIL BRASILEIRA DO BANCO MERCANTIL
+AGRO AGRONEGOCIO MERCANTIS ESPECIAL CORPORATIVO REAL ESTATE CAPITAL ASSET TRUST I II III IV V VI VII VIII IX X
+""".split())
+
+
+def _norm(t: str | None) -> str:
+    t = unicodedata.normalize("NFD", t or "").encode("ascii", "ignore").decode().upper()
+    return re.sub(r"[^A-Z0-9 ]+", " ", t)
+
+
+def _tokens(t: str | None) -> list[str]:
+    return [w for w in _norm(t).split() if len(w) >= 3 and w not in GENERICAS and not w.isdigit()]
+
+
+def _cadastro() -> dict[str, dict]:
+    db = config.DATA_DIR / "cedentes.sqlite"
+    try:
+        from . import cedentes
+        cedentes.importar_seed()
+    except Exception:  # noqa: BLE001 - sem seed/sem rede: segue só com a raiz do CNPJ
+        pass
+    if not db.exists():
+        return {}
+    con = sqlite3.connect(db)
+    out = {}
+    for c, rs, nf, soc in con.execute("SELECT cnpj, razao_social, nome_fantasia, socios FROM cedente_info "
+                                      "WHERE erro IS NULL"):
+        out[c] = {"razao": rs, "fantasia": nf,
+                  "socios": [s.get("nome") for s in json.loads(soc or "[]") if s.get("nome")]}
+    return out
+
+
+def _grupos(cedentes: list[tuple[str, float]], cad: dict) -> list[dict]:
+    """Agrupa os cedentes de um fundo: raiz igual, sócio em comum ou mesmo 1º nome significativo da razão social."""
+    pai = list(range(len(cedentes)))
+
+    def raiz(i):
+        while pai[i] != i:
+            pai[i] = pai[pai[i]]
+            i = pai[i]
+        return i
+
+    def unir(a, b):
+        pai[raiz(a)] = raiz(b)
+
+    info = []
+    for doc, _ in cedentes:
+        c = cad.get(doc, {})
+        t = _tokens(c.get("razao"))
+        info.append({"raiz": doc[:8] if len(doc) == 14 else doc, "socios": {_norm(s).strip() for s in c.get("socios", [])},
+                     "nome1": t[0] if t else None})
+    for i in range(len(cedentes)):
+        for j in range(i + 1, len(cedentes)):
+            a, b = info[i], info[j]
+            if a["raiz"] == b["raiz"] or (a["socios"] & b["socios"]) or (a["nome1"] and a["nome1"] == b["nome1"]):
+                unir(i, j)
+    g = defaultdict(list)
+    for i in range(len(cedentes)):
+        g[raiz(i)].append(i)
+    out = []
+    for idx in g.values():
+        docs = [cedentes[i][0] for i in idx]
+        nome = next((cad[d]["razao"] for d in docs if d in cad and cad[d].get("razao")), None)
+        out.append({"docs": docs, "pct": sum(cedentes[i][1] for i in idx), "nome": nome})
+    return sorted(out, key=lambda x: -x["pct"])
+
+
+def _rotulos() -> dict[str, dict]:
+    if not ROTULOS.exists():
+        return {}
+    return {r["cnpj"]: r for r in json.loads(ROTULOS.read_text())}
+
+
+def prioridade() -> dict[str, int]:
+    """Ordem das filas de leitura (foco atual: monocedentes): 0 = candidato a benefício tributário, 1 = monocedente,
+    2 = categoria monocedente sem grupo fechado ainda. Quem não aparece fica depois."""
+    from .db import df
+    try:
+        u = df("""SELECT m.cnpj, CASE WHEN m.monocedente AND m.bt_faixa <> 'improvável' THEN 0 WHEN m.monocedente THEN 1
+                         ELSE 2 END AS k
+                  FROM mono_fundo m JOIN fundo f USING (cnpj)
+                  WHERE m.monocedente OR f.categoria = 'monocedente_comercial'""")
+    except Exception:  # noqa: BLE001 - base antiga sem a tabela
+        return {}
+    return dict(zip(u.cnpj, u.k))
+
+
+def ordenar(u, limite: int):
+    """Ordena um DataFrame de fila (cnpj, pl e opcionalmente k = prioridade anterior) com monocedentes na frente."""
+    pr = prioridade()
+    u = u.copy()
+    u["_mono"] = u.cnpj.map(pr).fillna(9)
+    chaves = ["_mono"] + (["k"] if "k" in u.columns else []) + ["pl"]
+    return u.sort_values(chaves, ascending=[True] * (len(chaves) - 1) + [False], na_position="last").head(limite)
+
+
+def build_table(con) -> None:
+    import pandas as pd
+    cad = _cadastro()
+    ced = con.execute("""
+        SELECT k.cnpj, k.cedente_doc, k.pct FROM cedente_mes k JOIN fundo f ON f.cnpj = k.cnpj AND k.dt = f.ultimo_informe
+        WHERE k.cedente_doc <> '99999999999999' AND k.pct > 0 ORDER BY k.cnpj, k.rank""").fetchall()
+    por_fundo = defaultdict(list)
+    for c, d, p in ced:
+        por_fundo[c].append((d, float(p)))
+    # histórico de estágio: meses só com subordinada e até 3 cotistas
+    hist = {c: (m1, mt, ini) for c, m1, mt, ini in con.execute("""
+        WITH s AS (SELECT cnpj, dt, bool_and(tipo = 'subordinada') so_sub FROM serie_mes
+                   WHERE coalesce(pl_serie, 0) > 0 GROUP BY 1, 2)
+        SELECT m.cnpj, count(*) FILTER (WHERE s.so_sub AND m.nr_cotistas <= 3), count(*), min(m.dt)
+        FROM metricas_mes m JOIN s ON s.cnpj = m.cnpj AND s.dt = m.dt GROUP BY 1""").fetchall()}
+    fundos = con.execute("""
+        SELECT f.cnpj, f.nome, f.categoria, f.pl, f.gestor, m.nr_cotistas, r.estrutura, r.taxa_gestao, r.spread_senior_aa,
+               r.rentab_subordinada_12m_pct_cdi, k.exclusivo, m.inad_90,
+               (SELECT count(*) FROM serie_mes s WHERE s.cnpj = f.cnpj AND s.dt = f.ultimo_informe
+                  AND coalesce(s.pl_serie, 0) > 0) AS n_series
+        FROM fundo f LEFT JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
+        LEFT JOIN fundo_resumo r ON r.cnpj = f.cnpj LEFT JOIN cadastro k ON k.cnpj = f.cnpj
+        WHERE f.categoria NOT IN ('fic_fidc')""").df()
+    rot = _rotulos()
+    linhas, grupos_out = [], []
+    for f in fundos.itertuples(index=False):
+        cs = por_fundo.get(f.cnpj, [])
+        gs = _grupos(cs, cad) if cs else []
+        tot = sum(p for _, p in cs)
+        g1 = gs[0] if gs else None
+        conc = g1["pct"] / tot if g1 and tot else None
+        for i, g in enumerate(gs):
+            grupos_out.append({"cnpj": f.cnpj, "ordem": i + 1, "grupo": g["nome"], "cnpjs": ", ".join(g["docs"]),
+                               "n_cnpjs": len(g["docs"]), "pct_carteira": g["pct"] / 100,
+                               "pct_informados": g["pct"] / tot if tot else None})
+        m1, mt, ini = hist.get(f.cnpj, (0, 0, None))
+        cot = f.nr_cotistas if f.nr_cotistas == f.nr_cotistas else None
+        # nome do fundo x cedente/sócios
+        tok_f = set(_tokens(f.nome))
+        alvo = set()
+        for d in (g1["docs"] if g1 else []):
+            c = cad.get(d, {})
+            for t in [c.get("razao"), c.get("fantasia"), *c.get("socios", [])]:
+                alvo |= set(_tokens(t))
+        nome_bate = sorted(tok_f & alvo)
+
+        pts, sinais = 0, []
+
+        def s(p, txt):
+            nonlocal pts
+            pts += p
+            sinais.append(f"{'+' if p >= 0 else ''}{p} {txt}")
+
+        if m1 >= 6:
+            s(20, f"{m1} meses só com subordinada e até 3 cotistas")
+        elif m1 >= 3:
+            s(10, f"{m1} meses só com subordinada e até 3 cotistas")
+        if cot is not None:
+            if cot <= 3:
+                s(15, f"{int(cot)} cotista(s)")
+            elif cot <= 10:
+                s(10, f"{int(cot)} cotistas")
+            elif cot <= 30:
+                s(3, f"{int(cot)} cotistas")
+        tg = f.taxa_gestao if f.taxa_gestao == f.taxa_gestao else None
+        if tg is not None:
+            if tg <= 0.005:
+                s(15, f"taxa de gestão {tg * 100:.2f}% a.a.")
+            elif tg <= 0.01:
+                s(5, f"taxa de gestão {tg * 100:.2f}% a.a.")
+            else:
+                s(-20, f"taxa de gestão {tg * 100:.2f}% a.a. (alta para estrutura proprietária)")
+        sp = f.spread_senior_aa if f.spread_senior_aa == f.spread_senior_aa else None
+        if sp is not None:
+            if sp <= 0.045:
+                s(5, f"sênior a CDI + {sp * 100:.1f}% a.a.")
+            elif sp > 0.055:
+                s(-10, f"sênior a CDI + {sp * 100:.1f}% a.a. (remuneração de mercado)")
+        if conc is not None:
+            if conc >= 0.95:
+                s(10, f"maior grupo = {conc:.0%} dos cedentes")
+            elif conc >= CORTE_MONO:
+                s(5, f"maior grupo = {conc:.0%} dos cedentes")
+            if g1 and len(g1["docs"]) > 1:
+                s(5, f"{len(g1['docs'])} CNPJs do mesmo grupo cedendo")
+        if nome_bate:
+            s(10, "nome do fundo no cedente/sócios: " + ", ".join(nome_bate[:3]))
+        if isinstance(f.exclusivo, str) and f.exclusivo.upper().startswith("S"):
+            s(5, "fundo exclusivo")
+
+        estrutura = f.estrutura
+        if cot is not None and estrutura == "classe única" and cot <= 5:
+            estagio = 1
+        elif cot is not None and estrutura == "classes" and cot <= 10:
+            estagio = 2
+        elif m1 >= 3:
+            estagio = 3
+        else:
+            estagio = None
+        faixa = "provável" if pts >= 45 else "possível" if pts >= 30 else "improvável"
+        r = rot.get(f.cnpj, {})
+        linhas.append({
+            "cnpj": f.cnpj, "mono_grupo": g1["nome"] if g1 else None,
+            "mono_grupo_cnpjs": len(g1["docs"]) if g1 else None,
+            "mono_conc_grupo": conc, "mono_conc_carteira": g1["pct"] / 100 if g1 else None,
+            "mono_cedentes_informados": len(cs),
+            "monocedente": bool(conc is not None and conc >= CORTE_MONO and g1["pct"] / 100 >= CORTE_CARTEIRA),
+            "bt_meses_estagio1": m1, "bt_inicio": ini, "bt_estagio": estagio, "bt_score": pts, "bt_faixa": faixa,
+            "bt_sinais": " | ".join(sinais), "bt_nome_cedente": ", ".join(nome_bate) or None,
+            "bt_rotulo": r.get("rotulo"), "bt_rotulo_obs": r.get("obs"),
+        })
+    df = pd.DataFrame(linhas)
+    con.register("_m", df)
+    con.execute("CREATE OR REPLACE TABLE mono_fundo AS SELECT * FROM _m")
+    con.unregister("_m")
+    dg = pd.DataFrame(grupos_out, columns=["cnpj", "ordem", "grupo", "cnpjs", "n_cnpjs", "pct_carteira", "pct_informados"])
+    con.register("_g", dg)
+    con.execute("CREATE OR REPLACE TABLE mono_grupo AS SELECT * FROM _g")
+    con.unregister("_g")
+
+
+if __name__ == "__main__":
+    import duckdb
+    c = duckdb.connect(str(config.DB_PATH))
+    build_table(c)
+    print(c.execute("SELECT bt_faixa, count(*) FROM mono_fundo WHERE monocedente GROUP BY 1").fetchall())

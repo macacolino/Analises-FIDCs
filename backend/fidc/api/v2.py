@@ -2,6 +2,8 @@
 parâmetros manuais, grupos de pares e contexto setorial (BCB, originadores, red flags)."""
 from __future__ import annotations
 
+import re
+
 import json
 from datetime import datetime
 
@@ -372,6 +374,34 @@ def casas_fundos(casa: str, tipo: str = "gestor", formato: str | None = None):
                WHERE f.{col} = ? AND f.ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH
                ORDER BY f.pl DESC NULLS LAST""", [casa])
     return _out(d, formato, "Fundos")
+
+
+@router.get("/monocedentes")
+def monocedentes(todos: bool = False, formato: str | None = None):
+    """Universo monocedente (maior grupo de cedentes >= 80% dos informados e >= 50% da carteira) com o score de
+    estrutura de benefício tributário. todos=true inclui os fundos da categoria monocedente que não fecham o corte."""
+    filtro = "(m.monocedente OR f.categoria = 'monocedente_comercial')" if todos else "m.monocedente"
+    d = df(f"""SELECT f.cnpj, f.nome, f.categoria_nome, f.gestor, f.admin, f.pl, m.bt_score, m.bt_faixa, m.bt_estagio,
+                      m.bt_meses_estagio1, m.bt_inicio, m.bt_rotulo, m.mono_grupo, m.mono_grupo_cnpjs, m.mono_conc_grupo,
+                      m.mono_conc_carteira, m.mono_cedentes_informados, m.monocedente, me.nr_cotistas, r.estrutura,
+                      r.cotistas_senior, r.cotistas_subordinada, r.taxa_gestao, r.taxa_administracao, r.spread_senior_aa,
+                      r.rentab_subordinada_12m_pct_cdi, r.taxa_desconto_aa, me.subordinacao, me.inad_90, me.pdd_carteira,
+                      m.bt_nome_cedente, m.bt_sinais, f.ultimo_informe
+               FROM mono_fundo m JOIN fundo f USING (cnpj)
+               LEFT JOIN metricas_mes me ON me.cnpj = f.cnpj AND me.dt = f.ultimo_informe
+               LEFT JOIN fundo_resumo r ON r.cnpj = f.cnpj
+               WHERE {filtro} AND f.ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH
+               ORDER BY m.bt_score DESC, f.pl DESC NULLS LAST""")
+    return _out(d, formato, "Monocedentes",
+                "Score de benefício tributário: soma de indícios (histórico só com subordinada e poucos cotistas, "
+                "cotistas, taxa de gestão, remuneração da sênior, concentração no grupo, nome, exclusividade). "
+                "Provável >= 45, possível 30-44. Indício, não conclusão.")
+
+
+@router.get("/monocedentes/grupos/{cnpj}")
+def monocedente_grupos(cnpj: str):
+    """Cedentes do fundo agrupados por grupo econômico (raiz do CNPJ, sócios em comum, mesmo nome)."""
+    return df("SELECT * FROM mono_grupo WHERE cnpj = ? ORDER BY ordem", [re.sub(r"\D", "", cnpj)]).to_dict("records")
 
 
 @router.get("/consultorias")
