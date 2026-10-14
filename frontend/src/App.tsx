@@ -4,6 +4,7 @@ import { fmtDate, mesAno } from './fmt'
 import Feedback from './components/Feedback'
 import FundPicker from './components/FundPicker'
 import { Icone } from './components/Icones'
+import Casas from './pages/Casas'
 import Comparar from './pages/Comparar'
 import Consultorias from './pages/Consultorias'
 import Fundo from './pages/Fundo'
@@ -44,6 +45,7 @@ export default function App() {
           <div className="grp">Fundos</div>
           <Item to="/pesquisa" icone="pesquisa">Pesquisa</Item>
           <Item to="/comparar" icone="comparar">Comparar</Item>
+          <Item to="/casas" icone="casas">Gestoras e administradoras</Item>
           <div className="grp">Acompanhamento</div>
           <Item to="/carteira" icone="carteira">Carteira</Item>
           <Item to="/watchlist" icone="watchlist">Watchlist</Item>
@@ -75,6 +77,7 @@ export default function App() {
           <Route path="/qualidade" element={<Qualidade />} />
           <Route path="/pdd" element={<Pdd />} />
           <Route path="/consultorias" element={<Consultorias />} />
+          <Route path="/casas" element={<Casas />} />
           <Route path="/glossario" element={<Glossario />} />
           <Route path="/fundo/:cnpj" element={<Fundo />} />
           <Route path="/carteira" element={<Lista tipo="carteira" />} />

@@ -66,10 +66,13 @@ def buscar(q: str = "", categoria: str | None = None, grupo: str | None = None,
     sql = f"""
         SELECT f.cnpj, f.nome, f.categoria, f.categoria_nome, f.grupo, f.gestor, f.admin, f.pl,
                f.ultimo_informe, f.revisar, c.ia_diverge_informe, m.inad_90, m.pdd_carteira, m.subordinacao,
-               m.rentab_senior, k.consultoria, k.agente_cobranca
+               m.rentab_senior, k.consultoria, k.agente_cobranca, m.nr_cotistas, r.pl_medio_12m, r.estrutura,
+               r.cotistas_senior, r.cotistas_mezanino, r.cotistas_subordinada, r.taxa_desconto_aa,
+               r.taxa_administracao, r.taxa_gestao, r.sub_min_senior, r.spread_senior_aa, r.spread_mezanino_aa
         FROM fundo f LEFT JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
         LEFT JOIN classificacao c ON c.cnpj = f.cnpj
         LEFT JOIN consultoria_fundo k ON k.cnpj = f.cnpj
+        LEFT JOIN fundo_resumo r ON r.cnpj = f.cnpj
         {'WHERE ' + ' AND '.join(where) if where else ''}
         ORDER BY f.pl DESC NULLS LAST LIMIT {int(limit)}"""
     return df(sql, params)

@@ -25,6 +25,7 @@ import re
 import sqlite3
 import time
 from datetime import datetime
+from pathlib import Path
 
 from . import regulamentos as rg
 
@@ -380,11 +381,42 @@ def tabelas():
             campos.append({"cnpj": r["cnpj"], "campo": c["campo"], "valor_num": c.get("valor"),
                            "valor_txt": c.get("valor_txt"), "trecho": (c.get("trecho") or "")[:600],
                            "pagina": c.get("pagina"), "confianca": j.get("confianca")})
+    # taxas lidas para fundos sem leitura completa (passada de taxas): só entram onde a IA completa não tem o campo
+    tem = {(c["cnpj"], c["campo"]) for c in campos}
+    for r in taxas_avulsas():
+        j = json.loads(r["resultado"]) if isinstance(r["resultado"], str) else r["resultado"]
+        for c in j.get("campos") or []:
+            if (r["cnpj"], c["campo"]) in tem or (c.get("valor") is None and not c.get("valor_txt")):
+                continue
+            campos.append({"cnpj": r["cnpj"], "campo": c["campo"],
+                           "valor_num": c.get("valor") if not isinstance(c.get("valor"), str) else None,
+                           "valor_txt": c.get("valor_txt"), "trecho": (c.get("trecho") or "")[:600],
+                           "pagina": c.get("pagina"), "confianca": j.get("confianca")})
     cols_ia = ["cnpj", "doc_id", "modelo", "origem", "processado_em", "tese", "lastro", "consignado", "pct_consignado",
                "multicedente", "multissacado", "confianca", "observacoes", "eventos_avaliacao", "eventos_liquidacao",
                "benchmark_senior", "foco_precatorio", "precatorio_alimentar"]
     cols_c = ["cnpj", "campo", "valor_num", "valor_txt", "trecho", "pagina", "confianca"]
     return pd.DataFrame(ia, columns=cols_ia), pd.DataFrame(campos, columns=cols_c)
+
+
+SEED_TAXAS = Path(__file__).parent / "seed" / "taxas_avulsa.json.gz"
+
+
+def taxas_avulsas() -> list[dict]:
+    rows = json.loads(gzip.decompress(SEED_TAXAS.read_bytes())) if SEED_TAXAS.exists() else []
+    if rg.DB.exists():
+        con = db()
+        con.execute("CREATE TABLE IF NOT EXISTS reg_taxas_avulsa (cnpj TEXT PRIMARY KEY, resultado TEXT, processado_em TEXT)")
+        local = [{"cnpj": c, "resultado": r} for c, r in con.execute("SELECT cnpj, resultado FROM reg_taxas_avulsa")]
+        con.close()
+        feitos = {r["cnpj"] for r in local}
+        rows = [r for r in rows if r["cnpj"] not in feitos] + local
+    return rows
+
+
+def exportar_taxas_avulsas() -> Path:
+    SEED_TAXAS.write_bytes(gzip.compress(json.dumps(taxas_avulsas(), ensure_ascii=False).encode()))
+    return SEED_TAXAS
 
 
 def build_table(con) -> None:

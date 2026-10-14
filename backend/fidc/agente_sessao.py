@@ -142,18 +142,30 @@ def fila_taxas(limite: int, todos: bool = False) -> list[tuple[str, str]]:
               WHERE ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH
                 AND cnpj NOT IN (SELECT cnpj FROM regulamento_param
                                  WHERE campo IN ('taxa_administracao', 'taxa_gestao'))""")
-    u = u[u.cnpj.isin(lidos)].copy()
+    avulsos = {c for (c,) in con_avulsa()}
+    # já lidos pela IA sem taxa + nunca lidos (regulamento baixado) que ainda não passaram pela passada de taxas
+    ok = {c for (c,) in td.db().execute("SELECT cnpj FROM reg_doc WHERE status = 'ok'")}
+    u = u[u.cnpj.isin(lidos) | (u.cnpj.isin(ok) & ~u.cnpj.isin(avulsos))].copy()
     if not todos:
         def pendente(c):
             st, em = docs.get(c, (None, ""))
             if st == "nao_encontrado":
                 return False
+            if c not in lidos:
+                return True
             return c not in passados or (st is not None and em[:10] > passados[c])
         u = u[u.cnpj.map(pendente)]
     prio = {"precatorios_federais": 0, "precatorios": 0, "judicial": 1, "setor_publico_outros": 1}
     u["k"] = u.categoria.map(prio).fillna(2)
     u = u.sort_values(["k", "pl"], ascending=[True, False]).head(limite)
     return list(zip(u.cnpj, u.nome))
+
+
+def con_avulsa():
+    """Taxas de fundos que ainda não têm leitura completa da IA (não os tira da fila da leitura completa)."""
+    con = ag.db()
+    con.execute("CREATE TABLE IF NOT EXISTS reg_taxas_avulsa (cnpj TEXT PRIMARY KEY, resultado TEXT, processado_em TEXT)")
+    return con.execute("SELECT cnpj FROM reg_taxas_avulsa").fetchall()
 
 
 def texto_taxas(cnpj: str) -> str | None:
@@ -298,6 +310,12 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
         if taxas:
             t = texto_taxas(cnpj)
             if not t:
+                if cnpj not in {c for (c,) in con_avulsa()}:   # sem página com taxa: marca para não voltar à fila
+                    c2 = ag.db()
+                    c2.execute("INSERT OR IGNORE INTO reg_taxas_avulsa VALUES (?,?,?)", [cnpj, json.dumps(
+                        {"campos": [], "observacoes": "Nenhuma página com taxa no regulamento/FNET."}), "sem_texto"])
+                    c2.commit()
+                    c2.close()
                 continue
             rot = "Trechos com taxas"
         elif completo:
@@ -369,7 +387,12 @@ def mesclar_taxas(linhas: list[str]) -> dict:
     for l in linhas:
         j = json.loads(l)
         row = con.execute("SELECT resultado FROM reg_ia WHERE cnpj = ?", [j["cnpj"]]).fetchone()
-        if not row:
+        if not row:     # sem leitura completa: guarda à parte, o fundo segue na fila da leitura completa
+            con_avulsa()
+            con.execute("INSERT OR REPLACE INTO reg_taxas_avulsa VALUES (?,?,?)",
+                        [j["cnpj"], json.dumps(j["resultado"], ensure_ascii=False), date.today().isoformat()])
+            n += 1
+            com_taxa += bool({c["campo"] for c in j["resultado"]["campos"]} & {"taxa_administracao", "taxa_gestao"})
             continue
         r, novo = json.loads(row[0]), j["resultado"]
         achados = {c["campo"] for c in novo["campos"]}

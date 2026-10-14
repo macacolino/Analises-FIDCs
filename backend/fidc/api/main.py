@@ -97,7 +97,7 @@ def dic():
 # ------------------------------------------------------------------ fundos
 @app.get("/api/fundos")
 def fundos(q: str = "", categoria: str | None = None, grupo: str | None = None,
-           ativos: bool = True, limit: int = Query(50, le=5000), formato: str | None = None):
+           ativos: bool = True, limit: int = Query(50, le=20000), formato: str | None = None):
     return _out(consultas.buscar(q, categoria, grupo, ativos, limit), formato, "Fundos")
 
 

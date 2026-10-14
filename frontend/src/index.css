@@ -255,3 +255,9 @@ hr { border: 0; border-top: 1px solid var(--grid); margin: 16px 0; }
 .feedback-btn { border-radius: 999px; padding: 10px 18px; box-shadow: 0 6px 20px rgba(21, 37, 45, .25); }
 .feedback-box { width: min(360px, calc(100vw - 32px)); box-shadow: 0 12px 40px rgba(21, 37, 45, .25); }
 @media print { .feedback { display: none; } }
+
+/* filtros por faixa (Pesquisa) */
+.filtros-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px 16px; }
+.filtro-faixa { display: flex; flex-direction: column; gap: 4px; }
+.filtro-faixa > span { font-size: 12px; color: var(--muted); }
+.filtro-faixa input { width: 90px; }

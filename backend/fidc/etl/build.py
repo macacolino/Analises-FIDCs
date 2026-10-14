@@ -23,7 +23,7 @@ import duckdb
 from .. import config
 from .. import agente_regulamento, regulamentos
 from ..taxonomy import classify
-from .. import consultoria, pdd, pdd_docs
+from .. import consultoria, pdd, pdd_docs, resumo
 from . import bcb, casa, cvm_cadastro, cvm_ofertas, qualidade
 
 log = logging.getLogger(__name__)
@@ -609,6 +609,7 @@ def build(db_path: Path | None = None) -> Path:
     """)
     log.info("pdd por administrador"); pdd_docs.build_table(con); pdd.build_table(con)   # usa _meta
     log.info("consultoria de crédito"); consultoria.build_table(con)
+    log.info("resumo por fundo e por casa"); resumo.build_table(con)
     con.close()
     os.replace(tmp, final)
     log.info("base pronta: %s", final)

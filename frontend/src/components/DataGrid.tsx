@@ -47,14 +47,16 @@ function unidade(v: any, fmt: string | undefined): number | null {
 }
 
 const DICA: Record<string, string> = {
-  pct: 'em %: >5, <1,5, 5-10', pct100: 'em %: >5, 1-2', brl: 'R$ mi: >100, 50-200', x: '>1, 0,5-1',
+  pct: 'em %: >5, <1,5, 5-10', pct100: 'em %: >5, 1-2', brl: 'R$ mi: >100, 50-200, <1bi', x: '>1, 0,5-1',
   dias: 'dias: >360', int: '>10, 5-20',
 }
 
 /** casa uma expressão (">5", "<=1,5", "5-10", "=0", "7") com um número; null se a expressão não é numérica */
 export function casaNumero(expr: string, n: number | null): boolean | null {
-  const t = expr.trim().replace(/\s+/g, '').replace(',', '.').replace(',', '.')
+  let t = expr.trim().toLowerCase().replace(/\s+/g, '').replace(',', '.').replace(',', '.')
   if (!t) return true
+  // R$ em milhões na tela: "1bi" = 1000, "50mi" = 50
+  t = t.replace(/(\d+(?:\.\d+)?)bi/g, (_, x) => String(Number(x) * 1000)).replace(/(\d+(?:\.\d+)?)mi/g, '$1')
   let m = t.match(/^(>=|<=|>|<|=|<>|!=)(-?\d+(?:\.\d+)?)%?$/)
   if (m) {
     if (n == null) return false

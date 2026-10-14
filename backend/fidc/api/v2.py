@@ -351,6 +351,29 @@ def pdd_fundos(admin: str | None = None, formato: str | None = None):
     return _out(d, formato, "PDD por fundo")
 
 
+@router.get("/casas")
+def casas(tipo: str = "gestor", formato: str | None = None):
+    """Gestoras ou administradoras por AuM (PL somado dos fundos ativos) e medianas dos fundos."""
+    t = "admin_resumo" if tipo == "admin" else "gestor_resumo"
+    d = df(f"SELECT * FROM {t} ORDER BY pl DESC NULLS LAST")
+    return _out(d, formato, "Administradoras" if tipo == "admin" else "Gestoras",
+                "AuM = PL somado dos fundos ativos (último informe). Remuneração sênior/mezanino: CDI + x% a.a. estimado "
+                "pelo excesso mensal mediano sobre o CDI em 12 meses (só fundos com mais de uma classe).")
+
+
+@router.get("/casas/fundos")
+def casas_fundos(casa: str, tipo: str = "gestor", formato: str | None = None):
+    col = "admin" if tipo == "admin" else "gestor"
+    d = df(f"""SELECT f.cnpj, f.nome, f.categoria_nome, f.gestor, f.admin, f.pl, m.inad_90, m.pdd_carteira, m.subordinacao,
+                      r.sub_min_senior, r.spread_senior_aa, r.spread_mezanino_aa, r.taxa_gestao, r.taxa_administracao,
+                      r.taxa_desconto_aa, r.estrutura
+               FROM fundo f LEFT JOIN metricas_mes m ON m.cnpj = f.cnpj AND m.dt = f.ultimo_informe
+               LEFT JOIN fundo_resumo r ON r.cnpj = f.cnpj
+               WHERE f.{col} = ? AND f.ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH
+               ORDER BY f.pl DESC NULLS LAST""", [casa])
+    return _out(d, formato, "Fundos")
+
+
 @router.get("/consultorias")
 def consultorias(formato: str | None = None):
     """Consultorias de crédito nomeadas nos regulamentos, com os fundos ativos que atendem (último informe)."""
