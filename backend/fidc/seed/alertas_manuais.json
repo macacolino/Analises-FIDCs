@@ -1,0 +1,58 @@
+[
+ {
+  "cnpj": "51752029000160",
+  "tipo": "fraude",
+  "severidade": "alta",
+  "descricao": "Indício de fraude (apontado pelo time)",
+  "texto": "Fundo da casa Latache marcado pelo time como caso de fraude (Allan, 15/10/2026). Serve de exemplo para testar indicadores que antecipem fraude.",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "19476304000158",
+  "tipo": "fraude",
+  "severidade": "alta",
+  "descricao": "Indício de fraude (apontado pelo time)",
+  "texto": "Fundo da casa Latache marcado pelo time como caso de fraude (Allan, 15/10/2026). Serve de exemplo para testar indicadores que antecipem fraude.",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "26459235000130",
+  "tipo": "fraude",
+  "severidade": "alta",
+  "descricao": "Indício de fraude (apontado pelo time)",
+  "texto": "Fundo da casa Latache marcado pelo time como caso de fraude (Allan, 15/10/2026). Serve de exemplo para testar indicadores que antecipem fraude.",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "33554498000193",
+  "tipo": "fraude",
+  "severidade": "alta",
+  "descricao": "Indício de fraude (apontado pelo time)",
+  "texto": "Fundo da casa Latache marcado pelo time como caso de fraude (Allan, 15/10/2026). Serve de exemplo para testar indicadores que antecipem fraude.",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "44179672000181",
+  "tipo": "fraude",
+  "severidade": "alta",
+  "descricao": "Indício de fraude (apontado pelo time)",
+  "texto": "Fundo da casa Latache marcado pelo time como caso de fraude (Allan, 15/10/2026). Serve de exemplo para testar indicadores que antecipem fraude.",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "51606193000160",
+  "tipo": "fraude",
+  "severidade": "alta",
+  "descricao": "Indício de fraude (apontado pelo time)",
+  "texto": "Fundo da casa Latache marcado pelo time como caso de fraude (Allan, 15/10/2026). Serve de exemplo para testar indicadores que antecipem fraude.",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "53328690000179",
+  "tipo": "fraude",
+  "severidade": "alta",
+  "descricao": "Indício de fraude (apontado pelo time)",
+  "texto": "Fundo da casa Latache marcado pelo time como caso de fraude (Allan, 15/10/2026). Serve de exemplo para testar indicadores que antecipem fraude.",
+  "fonte": "Allan, 15/10/2026"
+ }
+]

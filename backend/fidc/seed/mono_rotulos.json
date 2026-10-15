@@ -208,5 +208,65 @@
   "rotulo": "nao_beneficio",
   "obs": "FIDC MDR II High Grade (Oriz)",
   "fonte": "Allan, 14/10/2026"
+ },
+ {
+  "cnpj": "51752029000160",
+  "rotulo": "nao_beneficio",
+  "obs": "Latache Legal Claims (casa com indício de fraude)",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "19476304000158",
+  "rotulo": "nao_beneficio",
+  "obs": "Latache II Distressed (casa com indício de fraude)",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "26459235000130",
+  "rotulo": "nao_beneficio",
+  "obs": "Latache III (casa com indício de fraude)",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "33554498000193",
+  "rotulo": "nao_beneficio",
+  "obs": "Latache High Yield (casa com indício de fraude)",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "44179672000181",
+  "rotulo": "nao_beneficio",
+  "obs": "Latache Crédito Estruturado (casa com indício de fraude)",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "63882874000130",
+  "rotulo": "nao_beneficio",
+  "obs": "Moto Honda II: financiamento de veículos/motos",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "32302163000115",
+  "rotulo": "nao_beneficio",
+  "obs": "Alpe: MCMS, concessão de crédito B2B",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "29720600000106",
+  "rotulo": "nao_beneficio",
+  "obs": "FIDC Nexus",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "42404659000153",
+  "rotulo": "nao_beneficio",
+  "obs": "Arcesp Consignado: consignado",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "55565510000106",
+  "rotulo": "nao_beneficio",
+  "obs": "TM4: cedente instituição de pagamento",
+  "fonte": "Allan, 15/10/2026"
  }
 ]

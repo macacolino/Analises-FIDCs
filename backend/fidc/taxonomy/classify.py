@@ -10,6 +10,8 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
+from pathlib import Path
+
 import pandas as pd
 import yaml
 
@@ -306,8 +308,15 @@ def classify_frame(df: pd.DataFrame, cats: list[Categoria] | None = None,
     return out
 
 
+def _seed_overrides() -> dict[str, str]:
+    """Categorias definidas pelo time e versionadas no repositório (seed/categorias_manuais.json)."""
+    import json
+    f = Path(__file__).parent.parent / "seed" / "categorias_manuais.json"
+    return {r["cnpj"]: r["categoria"] for r in json.loads(f.read_text())} if f.exists() else {}
+
+
 def build_table(con) -> None:
-    out = classify_frame(features(con), overrides=appdb.overrides())
+    out = classify_frame(features(con), overrides={**_seed_overrides(), **appdb.overrides()})
     con.register("_cls", out)
     con.execute("CREATE OR REPLACE TABLE classificacao AS SELECT * FROM _cls")
     con.unregister("_cls")

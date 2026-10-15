@@ -28,7 +28,7 @@ const VISOES: Visao[] = [
     'rem_senior_gap_aa', 'rem_senior_n', 'rentab_senior_12m_pct_cdi', 'rem_mez_texto', 'rem_mez_alvo_aa', 'rem_mez_entregue_aa',
     'rem_mez_gap_aa', 'rem_senior_doc', 'rem_senior_data', 'rem_confianca'] },
   { nome: 'Consultoria', cols: ['bt_faixa', 'pl', 'consultoria', 'consultoria_tipo', 'consultoria_n_fundos',
-    'mono_consultoria_ligada', 'consultoria_relacionada', 'consultoria_taxa_txt', 'consultoria_taxa_aa', 'consultoria_taxa_min_mes',
+    'mono_consultoria_ligada', 'agente_cobranca', 'mono_cobranca_ligada', 'consultoria_relacionada', 'consultoria_taxa_txt', 'consultoria_taxa_aa', 'consultoria_taxa_min_mes',
     'consultoria_paga_por', 'mono_consultoria_atividade', 'mono_consultoria_abertura', 'mono_grupo', 'gestor'] },
   { nome: 'Regulamento', cols: ['bt_score', 'bt_ia_sub', 'bt_ia_sub_nome', 'bt_ia_coobrigacao', 'bt_ia_indicio',
     'bt_ia_justificativa', 'bt_ia_cedente'] },
@@ -43,6 +43,7 @@ function Detalhe({ f, onFechar }: { f: Row; onFechar: () => void }) {
       <div className="row"><h2 style={{ margin: 0 }}><Link to={`/fundo/${f.cnpj}`}>{f.nome}</Link></h2><div className="spacer" />
         <button className="ghost" onClick={onFechar}>Fechar</button></div>
       <div className="muted">
+        {f.bt_alerta && <b style={{ color: 'var(--critical)' }}>⚠ {f.bt_alerta} · </b>}
         Score {f.bt_score} ({f.bt_faixa}) · estágio {f.bt_estagio ?? '–'} · {fmtValue(f.pl, 'brl')} · gestor {f.gestor ?? '–'}
         {f.bt_rotulo && <> · rótulo do time: <b>{f.bt_rotulo === 'beneficio_tributario' ? 'benefício tributário' : 'não é'}</b></>}
       </div>
@@ -66,11 +67,12 @@ function Detalhe({ f, onFechar }: { f: Row; onFechar: () => void }) {
             “{f.bt_ia_trecho}”{f.bt_ia_pagina ? ` (p. ${f.bt_ia_pagina})` : ''}</blockquote>}
         </div>
       )}
-      {f.consultoria && <div className="stack" style={{ gap: 4 }}>
+      {(f.consultoria || f.agente_cobranca) && <div className="stack" style={{ gap: 4 }}>
         <b>Consultoria de crédito</b>
-        <div>{f.consultoria}{f.consultoria_cnpj ? ` (${f.consultoria_cnpj})` : ''} · <b>{f.consultoria_tipo ?? '–'}</b>
+        <div>{f.consultoria ?? 'Consultoria não nomeada'}{f.consultoria_cnpj ? ` (${f.consultoria_cnpj})` : ''} · <b>{f.consultoria_tipo ?? '–'}</b>
           {f.consultoria_n_fundos ? ` · ${f.consultoria_n_fundos} FIDC(s) ativo(s)` : ''}
           {f.mono_consultoria_ligada && <> · <b style={{ color: 'var(--critical)' }}>{f.mono_consultoria_ligada}</b></>}</div>
+        {f.agente_cobranca && <div className="muted">Agente de cobrança: {f.agente_cobranca}{f.mono_cobranca_ligada ? ` · ${f.mono_cobranca_ligada}` : ''}</div>}
         <div className="muted">Taxa: {f.consultoria_taxa_txt ?? 'não lida'}{f.consultoria_paga_por ? ` · paga por: ${String(f.consultoria_paga_por).replaceAll('_', ' ')}` : ''}
           {f.mono_consultoria_atividade ? ` · Receita: ${f.mono_consultoria_atividade}` : ''}
           {f.mono_consultoria_abertura ? ` · aberta em ${f.mono_consultoria_abertura}` : ''}</div>
@@ -97,7 +99,7 @@ export default function Monocedentes() {
   const universo = useMemo(() => dados.filter((r) => r.monocedente), [dados])
   const bt = useMemo(() => universo.filter((r) => r.bt_faixa === 'provável' || r.bt_faixa === 'possível'), [universo])
   const grandes = useMemo(() => universo.filter((r) => r.bt_faixa === 'excluído (grande empresa)'), [universo])
-  const financ = useMemo(() => universo.filter((r) => r.bt_faixa === 'excluído (cedente financeiro)' || r.bt_faixa === 'excluído (cedente público)'), [universo])
+  const financ = useMemo(() => universo.filter((r) => ['excluído (cedente financeiro)', 'excluído (cedente público)', 'excluído (tipo de crédito)'].includes(r.bt_faixa)), [universo])
   const calib = useMemo(() => dados.filter((r) => r.bt_rotulo), [dados])
   const rem = useMemo(() => universo.filter((r) => !String(r.bt_faixa ?? '').startsWith('excluído')), [universo])
   const comMeta = rem.filter((r) => r.rem_senior_texto || r.rem_mez_texto)
@@ -134,8 +136,8 @@ export default function Monocedentes() {
             <div className="c">{fmtValue(soma(universo.filter((r) => r.bt_faixa === 'possível')), 'brl')}</div></div>
           <div className="kpi"><div className="l">Estágios (prov. + poss.)</div>
             <div className="v">{est(1)} · {est(2)} · {est(3)}</div><div className="c">1 só sub · 2 sênior+sub · 3 distribuído</div></div>
-          <div className="kpi"><div className="l">Excluídos: financeiro/pagamentos/público</div><div className="v">{financ.length}</div>
-            <div className="c">banco, SCD/bancarizadora, securitizadora, meios de pagamento, ente público</div></div>
+          <div className="kpi"><div className="l">Excluídos: financeiro, público e tipo de crédito</div><div className="v">{financ.length}</div>
+            <div className="c">banco, SCD/bancarizadora, IP, securitizadora, meios de pagamento, ente público, consignado, MCMS, veículos</div></div>
           <div className="kpi"><div className="l">Excluídos: cedente grande empresa</div><div className="v">{grandes.length}</div>
             <div className="c">S.A. aberta ou capital ≥ R$ 1 bi (cativo, fornecedores...)</div></div>
           <div className="kpi"><div className="l">Remuneração prometida lida</div>
@@ -165,6 +167,8 @@ export default function Monocedentes() {
           {aba === 'calibracao' && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
             Exemplos passados pelo time. "Certo" = benefício tributário que é monocedente com faixa provável/possível, ou
             não-benefício fora disso. Na Oriz, só o MDR II é "não é" (fundo de recebíveis de cartão); Mundial e JPA Agro são benefício tributário.
+            Em 15/10 entraram como "não é": Latache (indício de fraude), Moto Honda II (veículos), Alpe (MCMS), Nexus,
+            Arcesp Consignado e TM4 (cedente instituição de pagamento).
           </div>}
         </div>
       )}

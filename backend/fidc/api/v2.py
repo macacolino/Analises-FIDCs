@@ -399,7 +399,7 @@ def monocedentes(todos: bool = False, formato: str | None = None):
                       cf.consultoria_n_fundos, cf.consultoria_relacionada, cf.consultoria_taxa_txt, cf.consultoria_taxa_aa,
                       cf.consultoria_taxa_min_mes, cf.consultoria_paga_por, cf.consultoria_origem,
                       m.mono_consultoria_ligada, m.mono_consultoria_cnae, m.mono_consultoria_atividade,
-                      m.mono_consultoria_abertura, m.mono_consultoria_capital
+                      m.mono_consultoria_abertura, m.mono_consultoria_capital, m.mono_cobranca_ligada, cf.agente_cobranca, m.bt_alerta
                FROM mono_fundo m JOIN fundo f USING (cnpj)
                LEFT JOIN consultoria_fundo cf ON cf.cnpj = f.cnpj
                LEFT JOIN rem_fundo rf ON rf.cnpj = f.cnpj

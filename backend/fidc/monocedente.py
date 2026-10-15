@@ -84,7 +84,7 @@ def _cadastro() -> dict[str, dict]:
     return out
 
 
-_FIN_NOME = re.compile(r"SOCIEDADE DE CREDITO DIRETO|\bSCD\b|\bBANCO\b|INSTITUICAO DE PAGAMENTO|SECURITIZADORA|"
+_FIN_NOME = re.compile(r"SOCIEDADE DE CREDITO DIRETO|\bSCD\b|\bBANCO\b|INSTITUICAO\s+DE\s+PAGAMENTO|SECURITIZADORA|"
                        r"EMPRESTIMO ENTRE PESSOAS|CREDITO,? FINANCIAMENTO|DISTRIBUIDORA DE TITULOS|CORRETORA DE")
 
 
@@ -103,6 +103,12 @@ def fundo_pagamento(nome: str | None, categoria: str | None) -> str | None:
 _PUB = re.compile(r"MUNICIPIO|ESTADO D[OAE] |AUTARQUIA|ADMINISTRACAO PUBLICA|ORGAO PUBLICO|FUNDACAO PUBLICA|PODER EXECUTIVO|"
                   r"PREFEITURA|SECRETARIA")
 PUBLICAS = {"precatorios", "precatorios_federais", "setor_publico_outros", "judicial"}
+# tipos de crédito que não são estrutura de benefício tributário (Allan, 15/10/2026): consignado, multicedente
+# multissacado (concessão de crédito B2B) e financiamento de veículos
+TIPOS_FORA = {"consignado_publico": "consignado", "consignado_privado": "consignado",
+              "consignado_indefinido": "consignado", "multicedente_multissacado": "multicedente multissacado (MCMS)",
+              "veiculos": "financiamento de veículos"}
+ALERTAS = Path(__file__).parent / "seed" / "alertas_manuais.json"
 
 
 def publico(c: dict, categoria: str | None) -> str | None:
@@ -161,6 +167,27 @@ def _grupos(cedentes: list[tuple[str, float]], cad: dict) -> list[dict]:
         out.append({"docs": docs, "pct": sum(cedentes[i][1] for i in idx), "nome": nome,
                     "cnae": c0.get("cnae"), "atividade": c0.get("atividade")})
     return sorted(out, key=lambda x: -x["pct"])
+
+
+def _ligada(nome: str | None, doc: str, g1: dict | None, cad: dict, quem: str) -> str | None:
+    """Prestador (consultoria, agente de cobrança) do grupo do cedente: o próprio cedente, mesma raiz de CNPJ,
+    sócio em comum (Receita) ou mesmo 1º nome significativo da razão social."""
+    if not nome or not g1:
+        return None
+    docs = g1["docs"]
+    pc = cad.get(doc, {}) if doc else {}
+    soc_g = {_norm(x).strip() for d in docs for x in cad.get(d, {}).get("socios", [])}
+    soc_c = {_norm(x).strip() for x in pc.get("socios", [])}
+    nom_g = {(_tokens(cad.get(d, {}).get("razao")) or [None])[0] for d in docs} - {None}
+    if doc and doc in docs:
+        return f"{quem} é o próprio cedente"
+    if doc and doc[:8] in {d[:8] for d in docs}:
+        return "mesma raiz de CNPJ do cedente"
+    if soc_c & soc_g:
+        return "sócio em comum com o cedente: " + ", ".join(sorted(soc_c & soc_g)[:2]).title()
+    if (_tokens(pc.get("razao") or nome) or [None])[0] in nom_g:
+        return "mesmo nome do cedente"
+    return None
 
 
 def _rotulos() -> dict[str, dict]:
@@ -222,11 +249,12 @@ def build_table(con) -> None:
     except Exception:  # noqa: BLE001
         ia = {}
     try:
-        cons = {c: (n, re.sub(r"\D", "", cj or "")) for c, n, cj in con.execute(
-            "SELECT cnpj, consultoria, consultoria_cnpj FROM consultoria_fundo WHERE consultoria_situacao = 'nomeada'"
-            ).fetchall()}
+        cons = {c: (n, re.sub(r"\D", "", cj or ""), an, re.sub(r"\D", "", aj or "")[:14]) for c, n, cj, an, aj in con.execute(
+            "SELECT cnpj, CASE WHEN consultoria_situacao = 'nomeada' THEN consultoria END, consultoria_cnpj, "
+            "agente_cobranca, agente_cobranca_cnpj FROM consultoria_fundo").fetchall()}
     except Exception:  # noqa: BLE001 - base sem consultoria
         cons = {}
+    alertas = {a["cnpj"]: a["descricao"] for a in json.loads(ALERTAS.read_text())} if ALERTAS.exists() else {}
     linhas, grupos_out = [], []
     for f in fundos.itertuples(index=False):
         cs = por_fundo.get(f.cnpj, [])
@@ -331,7 +359,10 @@ def build_table(con) -> None:
         pag = fundo_pagamento(f.nome, f.categoria)
         if pag and not fin:
             fin = "fundo de recebíveis de meios de pagamento/cartão (" + pag + ")"
-        if pub:
+        if f.categoria in TIPOS_FORA and not pub:
+            faixa = "excluído (tipo de crédito)"
+            sinais.insert(0, "fora: " + TIPOS_FORA[f.categoria])
+        elif pub:
             faixa = "excluído (cedente público)"
             sinais.insert(0, "fora: crédito público/judicial - " + pub)
         elif fin:
@@ -341,21 +372,10 @@ def build_table(con) -> None:
             faixa = "excluído (grande empresa)"
             sinais.insert(0, "fora: cedente grande empresa - " + grande)
         # consultoria de crédito x grupo do cedente: mesma raiz, sócio em comum ou mesmo nome
-        cn, cdoc = cons.get(f.cnpj, (None, ""))
-        ligada, ccad = None, cad.get(cdoc, {}) if cdoc else {}
-        if cn and g1:
-            docs = g1["docs"]
-            soc_g = {_norm(x).strip() for d in docs for x in cad.get(d, {}).get("socios", [])}
-            soc_c = {_norm(x).strip() for x in ccad.get("socios", [])}
-            nom_g = {(_tokens(cad.get(d, {}).get("razao")) or [None])[0] for d in docs} - {None}
-            if cdoc and cdoc in docs:
-                ligada = "a consultoria é o próprio cedente"
-            elif cdoc and cdoc[:8] in {d[:8] for d in docs}:
-                ligada = "mesma raiz de CNPJ do cedente"
-            elif soc_c & soc_g:
-                ligada = "sócio em comum com o cedente: " + ", ".join(sorted(soc_c & soc_g)[:2]).title()
-            elif (_tokens(ccad.get("razao") or cn) or [None])[0] in nom_g:
-                ligada = "mesmo nome do cedente"
+        cn, cdoc, an, adoc = cons.get(f.cnpj, (None, "", None, ""))
+        ccad = cad.get(cdoc, {}) if cdoc else {}
+        ligada = _ligada(cn, cdoc, g1, cad, "a consultoria")
+        cob_ligada = _ligada(an, adoc, g1, cad, "o agente de cobrança")
         r = rot.get(f.cnpj, {})
         linhas.append({
             "cnpj": f.cnpj, "mono_grupo": g1["nome"] if g1 else None,
@@ -374,6 +394,7 @@ def build_table(con) -> None:
             "mono_consultoria_ligada": ligada, "mono_consultoria_cnae": ccad.get("cnae"),
             "mono_consultoria_atividade": ccad.get("atividade"), "mono_consultoria_abertura": ccad.get("abertura"),
             "mono_consultoria_capital": ccad.get("capital"),
+            "mono_cobranca_ligada": cob_ligada, "bt_alerta": alertas.get(f.cnpj),
         })
     df = pd.DataFrame(linhas)
     con.register("_m", df)
