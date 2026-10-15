@@ -352,11 +352,23 @@ def alertas(cnpjs: list[str]) -> dict[str, list[dict]]:
                         "texto": f"O fundo ainda não entregou o informe de {ref:%m/%Y}; o último na CVM é de "
                                  f"{pd.Timestamp(a['dt']):%m/%Y}."})
         out[cnpj] = lst
+    for n in _notas_time():
+        if n["cnpj"] in cnpjs:
+            out.setdefault(n["cnpj"], []).insert(0, {"id": "nota_time", "descricao": "Nota do time: " + n["nota"],
+                                                     "severidade": "info", "texto": n["nota"] + f" ({n['fonte']})"})
     for a in _alertas_manuais():
         if a["cnpj"] in cnpjs:
             out.setdefault(a["cnpj"], []).insert(0, {"id": "manual_" + a["tipo"], "descricao": a["descricao"],
                                                       "severidade": a["severidade"], "texto": a["texto"]})
     return out
+
+
+def _notas_time() -> list[dict]:
+    """Notas do time sobre o fundo (seed/notas_fundo.json), ex.: consórcio, NPL educacional."""
+    import json
+    from pathlib import Path
+    f = Path(__file__).parent / "seed" / "notas_fundo.json"
+    return json.loads(f.read_text()) if f.exists() else []
 
 
 def _alertas_manuais() -> list[dict]:

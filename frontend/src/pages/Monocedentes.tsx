@@ -13,12 +13,12 @@ const COLS = ['nome', 'bt_score', 'bt_faixa', 'bt_estagio', 'bt_meses_estagio1',
   'mono_grupo_cnpjs', 'pl', 'nr_cotistas', 'estrutura', 'taxa_gestao', 'taxa_gestao_min_mes', 'taxa_administracao_min_mes',
   'consultoria', 'consultoria_tipo', 'rem_senior_texto', 'rem_senior_alvo_aa', 'spread_senior_aa',
   'rem_senior_gap_aa', 'rentab_subordinada_12m_pct_cdi',
-  'bt_ia_sub', 'bt_ia_indicio', 'gestor', 'admin', 'categoria_nome', 'bt_rotulo', 'bt_sinais']
+  'bt_ia_sub', 'bt_ia_indicio', 'gestor', 'admin', 'categoria_nome', 'bt_rotulo', 'bt_nota', 'bt_alerta', 'bt_sinais']
 const COLS_REM = ['nome', 'rem_senior_texto', 'rem_senior_alvo_aa', 'rem_senior_entregue_aa', 'rem_senior_gap_aa', 'rem_senior_n',
   'rentab_senior_12m_pct_cdi', 'rem_mez_texto', 'rem_mez_alvo_aa', 'rem_mez_gap_aa', 'bt_faixa', 'pl', 'gestor', 'rem_senior_doc',
   'rem_senior_data', 'rem_confianca']
 const VISOES: Visao[] = [
-  { nome: 'Triagem', cols: ['bt_score', 'bt_faixa', 'bt_estagio', 'mono_grupo', 'pl', 'nr_cotistas', 'taxa_gestao', 'gestor', 'bt_sinais'] },
+  { nome: 'Triagem', cols: ['bt_score', 'bt_faixa', 'bt_estagio', 'mono_grupo', 'pl', 'nr_cotistas', 'taxa_gestao', 'gestor', 'bt_nota', 'bt_alerta', 'bt_sinais'] },
   { nome: 'Estrutura', cols: ['bt_estagio', 'bt_meses_estagio1', 'bt_inicio', 'estrutura', 'nr_cotistas', 'cotistas_senior',
     'cotistas_subordinada', 'subordinacao', 'pl'] },
   { nome: 'Economia', cols: ['bt_score', 'taxa_gestao', 'taxa_gestao_min_mes', 'taxa_administracao', 'taxa_administracao_min_mes',
@@ -44,6 +44,7 @@ function Detalhe({ f, onFechar }: { f: Row; onFechar: () => void }) {
         <button className="ghost" onClick={onFechar}>Fechar</button></div>
       <div className="muted">
         {f.bt_alerta && <b style={{ color: 'var(--critical)' }}>⚠ {f.bt_alerta} · </b>}
+        {f.bt_nota && <b>Nota do time: {f.bt_nota} · </b>}
         Score {f.bt_score} ({f.bt_faixa}) · estágio {f.bt_estagio ?? '–'} · {fmtValue(f.pl, 'brl')} · gestor {f.gestor ?? '–'}
         {f.bt_rotulo && <> · rótulo do time: <b>{f.bt_rotulo === 'beneficio_tributario' ? 'benefício tributário' : 'não é'}</b></>}
       </div>
@@ -137,7 +138,7 @@ export default function Monocedentes() {
           <div className="kpi"><div className="l">Estágios (prov. + poss.)</div>
             <div className="v">{est(1)} · {est(2)} · {est(3)}</div><div className="c">1 só sub · 2 sênior+sub · 3 distribuído</div></div>
           <div className="kpi"><div className="l">Excluídos: financeiro, público e tipo de crédito</div><div className="v">{financ.length}</div>
-            <div className="c">banco, SCD/bancarizadora, IP, securitizadora, meios de pagamento, ente público, consignado, MCMS, veículos</div></div>
+            <div className="c">banco, SCD/bancarizadora, IP e auxiliares financeiros (CNAE 66), meios de pagamento, ente público, consignado, veículos, consórcio</div></div>
           <div className="kpi"><div className="l">Excluídos: cedente grande empresa</div><div className="v">{grandes.length}</div>
             <div className="c">S.A. aberta ou capital ≥ R$ 1 bi (cativo, fornecedores...)</div></div>
           <div className="kpi"><div className="l">Remuneração prometida lida</div>
@@ -168,7 +169,8 @@ export default function Monocedentes() {
             Exemplos passados pelo time. "Certo" = benefício tributário que é monocedente com faixa provável/possível, ou
             não-benefício fora disso. Na Oriz, só o MDR II é "não é" (fundo de recebíveis de cartão); Mundial e JPA Agro são benefício tributário.
             Em 15/10 entraram como "não é" (o Marajó saiu dos positivos): Latache (indício de fraude), Moto Honda II (veículos), Alpe (MCMS), Nexus,
-            Arcesp Consignado e TM4 (cedente instituição de pagamento).
+            Arcesp Consignado e TM4 (cedente instituição de pagamento). MCMS voltou ao universo (análise caso a caso);
+            Directcon, Sinai Direct e X7 (consórcio) saem por marcação do time.
           </div>}
         </div>
       )}

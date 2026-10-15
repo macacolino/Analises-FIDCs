@@ -1,0 +1,26 @@
+[
+ {
+  "cnpj": "62838783000134",
+  "nota": "NPL com foco educacional (carteira de inadimplência de mensalidades).",
+  "excluir_bt": null,
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "60777129000132",
+  "nota": "Consórcio: compra de cartas de consórcio contempladas.",
+  "excluir_bt": "consórcio",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "60232878000184",
+  "nota": "Consórcio.",
+  "excluir_bt": "consórcio",
+  "fonte": "Allan, 15/10/2026"
+ },
+ {
+  "cnpj": "67507430000175",
+  "nota": "Consórcio.",
+  "excluir_bt": "consórcio",
+  "fonte": "Allan, 15/10/2026"
+ }
+]

@@ -240,6 +240,7 @@ def _merge_catalogo() -> None:
         "mono_cobranca_ligada": ("Agente de cobrança ligado ao cedente", "txt",
                                  "Agente de cobrança é o cedente ou do mesmo grupo (raiz, sócio, nome). Só informativo"),
         "bt_alerta": ("Alerta do time", "txt", "Marcação manual (ex.: indício de fraude)"),
+        "bt_nota": ("Nota do time", "txt", "Observação do time sobre o fundo (ex.: consórcio, NPL educacional)"),
         "mono_consultoria_atividade": ("Atividade da consultoria", "txt", "CNAE principal (Receita)"),
         "mono_consultoria_abertura": ("Abertura da consultoria", "txt", "Data de abertura na Receita"),
         "mono_consultoria_capital": ("Capital da consultoria", "brl", ""),

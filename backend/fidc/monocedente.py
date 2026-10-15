@@ -104,10 +104,11 @@ _PUB = re.compile(r"MUNICIPIO|ESTADO D[OAE] |AUTARQUIA|ADMINISTRACAO PUBLICA|ORG
                   r"PREFEITURA|SECRETARIA")
 PUBLICAS = {"precatorios", "precatorios_federais", "setor_publico_outros", "judicial"}
 # tipos de crédito que não são estrutura de benefício tributário (Allan, 15/10/2026): consignado, multicedente
-# multissacado (concessão de crédito B2B) e financiamento de veículos
+# multissacado ficou de fora por ora; financiamento de veículos
+# (MCMS volta a entrar: análise caso a caso, Allan 15/10/2026)
 TIPOS_FORA = {"consignado_publico": "consignado", "consignado_privado": "consignado",
-              "consignado_indefinido": "consignado", "multicedente_multissacado": "multicedente multissacado (MCMS)",
-              "veiculos": "financiamento de veículos"}
+              "consignado_indefinido": "consignado", "veiculos": "financiamento de veículos"}
+NOTAS = Path(__file__).parent / "seed" / "notas_fundo.json"
 ALERTAS = Path(__file__).parent / "seed" / "alertas_manuais.json"
 
 
@@ -126,6 +127,10 @@ def financeiro(c: dict) -> str | None:
     (6461-6463: holding do grupo da empresa é justamente o caso que interessa)."""
     cnae = re.sub(r"\D", "", c.get("cnae") or "")
     if cnae[:2] == "64" and cnae[:4] not in ("6461", "6462", "6463"):
+        return f"CNAE {c.get('cnae')} ({c.get('atividade')})"
+    # grupo 66: auxiliares dos serviços financeiros (instituição de pagamento, administração de cartões,
+    # correspondentes, intermediação); fora os corretores de seguros (6622). Allan, 15/10/2026
+    if cnae[:2] == "66" and cnae[:4] != "6622":
         return f"CNAE {c.get('cnae')} ({c.get('atividade')})"
     if _FIN_NOME.search(_norm(c.get("razao"))):
         return "razão social de instituição financeira"
@@ -255,6 +260,7 @@ def build_table(con) -> None:
     except Exception:  # noqa: BLE001 - base sem consultoria
         cons = {}
     alertas = {a["cnpj"]: a["descricao"] for a in json.loads(ALERTAS.read_text())} if ALERTAS.exists() else {}
+    notas = {n["cnpj"]: n for n in json.loads(NOTAS.read_text())} if NOTAS.exists() else {}
     linhas, grupos_out = [], []
     for f in fundos.itertuples(index=False):
         cs = por_fundo.get(f.cnpj, [])
@@ -359,7 +365,11 @@ def build_table(con) -> None:
         pag = fundo_pagamento(f.nome, f.categoria)
         if pag and not fin:
             fin = "fundo de recebíveis de meios de pagamento/cartão (" + pag + ")"
-        if f.categoria in TIPOS_FORA and not pub:
+        nt = notas.get(f.cnpj, {})
+        if nt.get("excluir_bt") and not pub:
+            faixa = "excluído (tipo de crédito)"
+            sinais.insert(0, "fora: " + nt["excluir_bt"] + " (marcado pelo time)")
+        elif f.categoria in TIPOS_FORA and not pub:
             faixa = "excluído (tipo de crédito)"
             sinais.insert(0, "fora: " + TIPOS_FORA[f.categoria])
         elif pub:
@@ -395,6 +405,7 @@ def build_table(con) -> None:
             "mono_consultoria_atividade": ccad.get("atividade"), "mono_consultoria_abertura": ccad.get("abertura"),
             "mono_consultoria_capital": ccad.get("capital"),
             "mono_cobranca_ligada": cob_ligada, "bt_alerta": alertas.get(f.cnpj),
+            "bt_nota": notas.get(f.cnpj, {}).get("nota"),
         })
     df = pd.DataFrame(linhas)
     con.register("_m", df)
