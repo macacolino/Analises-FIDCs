@@ -195,7 +195,7 @@ export function DataGrid({ rows, cols, exportUrl, height = 520, title, extra, pi
   const mostradas = useMemo(() => {
     const oc = new Set(prefs.ocultas)
     return new Set([...camposBase.filter((f) => !oc.has(f)), ...prefs.extras])
-  }, [camposBase, prefs])
+  }, [camposBase, prefs.ocultas, prefs.extras])
   const alterarColuna = (f: string, on: boolean) => setPrefs((p) => {
     if (base.has(f)) return { ...p, ocultas: on ? p.ocultas.filter((x) => x !== f) : [...p.ocultas, f] }
     return { ...p, extras: on ? [...p.extras, f] : p.extras.filter((x) => x !== f) }
@@ -253,11 +253,13 @@ export function DataGrid({ rows, cols, exportUrl, height = 520, title, extra, pi
         },
       },
       resizable: true, wrapHeaderText: true, autoHeaderHeight: true,
-      minWidth: 80, maxWidth: 420, suppressHeaderMenuButton: true,
+      minWidth: 80, maxWidth: 1600, suppressHeaderMenuButton: true,
       pinned: i < pinned ? 'left' : undefined,
       type: numeric ? 'rightAligned' : undefined,
       valueFormatter: (p) => fmtValue(p.value, f),
       ...baseDef,
+      // largura informada pela página é só a inicial: depois vale a que o usuário arrastar
+      ...(baseDef.width != null ? { width: undefined, initialWidth: baseDef.width } : {}),
       colId: field,
       hide: !mostradas.has(field),
     }
@@ -321,8 +323,8 @@ export function DataGrid({ rows, cols, exportUrl, height = 520, title, extra, pi
       </div>
       <div style={rows && rows.length <= 12 ? undefined : { height }}>
         <AgGridReact theme={theme} rowData={linhas} columnDefs={colDefs} maintainColumnOrder
-          defaultColDef={{ flex: 0, width: 130 }} animateRows={false} domLayout={rows && rows.length <= 12 ? 'autoHeight' : 'normal'}
-          tooltipShowDelay={300} autoSizeStrategy={{ type: 'fitCellContents' }} enableCellTextSelection ensureDomOrder
+          defaultColDef={{ flex: 0, initialWidth: 130 }} animateRows={false} domLayout={rows && rows.length <= 12 ? 'autoHeight' : 'normal'}
+          tooltipShowDelay={300}  enableCellTextSelection ensureDomOrder
           overlayNoRowsTemplate="Sem dados" loading={!rows}
           quickFilterText={busca} cacheQuickFilter
           quickFilterParser={(q) => semAcento(q).split(/\s+/).filter(Boolean)}
@@ -331,6 +333,14 @@ export function DataGrid({ rows, cols, exportUrl, height = 520, title, extra, pi
             api.current = e.api
             if (prefs.estado?.length) e.api.applyColumnState({ state: prefs.estado, applyOrder: true })
             atualizar()
+          }}
+          onFirstDataRendered={(e) => {
+            // ajuste automático só na primeira vez (sem largura salva), com teto de 420 px; depois vale o que o
+            // usuário arrastar, sem limite
+            if (prefs.estado?.some((c) => c.width)) return
+            e.api.autoSizeAllColumns()
+            const largas = e.api.getColumnState().filter((c) => (c.width ?? 0) > 420).map((c) => ({ key: c.colId, newWidth: 420 }))
+            if (largas.length) e.api.setColumnWidths(largas)
           }}
           onColumnMoved={(e) => { if (e.finished) salvarEstado() }}
           onColumnResized={(e) => { if (e.finished && e.source === 'uiColumnResized') salvarEstado() }}
