@@ -355,12 +355,14 @@ def _resumo_tipo(ss: list[dict]) -> dict:
         vig = [s for s in vig if _dt(s.get("data_documento")) == ult]
     cdi = [s["spread_aa"] / 100 for s in vig if s.get("indexador") == "cdi" and s.get("spread_aa") is not None]
     pct = [s["pct_cdi"] / 100 for s in vig if s.get("indexador") == "pct_cdi" and s.get("pct_cdi") is not None]
+    pre = [s["taxa_prefixada_aa"] / 100 for s in vig if s.get("indexador") == "prefixado" and s.get("taxa_prefixada_aa") is not None]
     idx = sorted({s.get("indexador") for s in vig})
     return {
         "texto": " | ".join(dict.fromkeys(s.get("formula") or s.get("indexador") for s in vig))[:400],
         "indexador": idx[0] if len(idx) == 1 else "misto",
         "spread_aa": sum(cdi) / len(cdi) if cdi else None, "spread_min": min(cdi) if cdi else None,
         "spread_max": max(cdi) if cdi else None, "pct_cdi": sum(pct) / len(pct) if pct else None,
+        "pre": sum(pre) / len(pre) if pre else None,
         "n": len(vig), "doc": vig[0].get("documento"), "data": max(_dt(s.get("data_documento")) for s in vig) or None,
     }
 
@@ -380,20 +382,21 @@ def build_table(con) -> None:
             "rem_obs": r.get("observacoes"), "rem_sub": r.get("subordinada_remuneracao"),
             "rem_senior_texto": sen.get("texto"), "rem_senior_indexador": sen.get("indexador"),
             "rem_senior_spread_aa": sen.get("spread_aa"), "rem_senior_spread_min": sen.get("spread_min"),
-            "rem_senior_spread_max": sen.get("spread_max"), "rem_senior_pct_cdi": sen.get("pct_cdi"),
+            "rem_senior_spread_max": sen.get("spread_max"), "rem_senior_pct_cdi": sen.get("pct_cdi"), "rem_senior_pre_aa": sen.get("pre"),
             "rem_senior_n": sen.get("n"), "rem_senior_doc": sen.get("doc"), "rem_senior_data": sen.get("data"),
             "rem_mez_texto": mez.get("texto"), "rem_mez_indexador": mez.get("indexador"),
-            "rem_mez_spread_aa": mez.get("spread_aa"), "rem_mez_pct_cdi": mez.get("pct_cdi"),
+            "rem_mez_spread_aa": mez.get("spread_aa"), "rem_mez_pct_cdi": mez.get("pct_cdi"), "rem_mez_pre_aa": mez.get("pre"),
         })
     cols_s = ["cnpj", "ordem"] + SCHEMA["properties"]["series"]["items"]["required"]
     s = pd.DataFrame(series, columns=cols_s)
     f = pd.DataFrame(fundos, columns=["cnpj", "rem_lida", "rem_n_series", "rem_confianca", "rem_obs", "rem_sub",
                                       "rem_senior_texto", "rem_senior_indexador", "rem_senior_spread_aa",
-                                      "rem_senior_spread_min", "rem_senior_spread_max", "rem_senior_pct_cdi",
+                                      "rem_senior_spread_min", "rem_senior_spread_max", "rem_senior_pct_cdi", "rem_senior_pre_aa",
                                       "rem_senior_n", "rem_senior_doc", "rem_senior_data", "rem_mez_texto",
-                                      "rem_mez_indexador", "rem_mez_spread_aa", "rem_mez_pct_cdi"])
+                                      "rem_mez_indexador", "rem_mez_spread_aa", "rem_mez_pct_cdi", "rem_mez_pre_aa"])
     for c in ("rem_n_series", "rem_senior_spread_aa", "rem_senior_spread_min", "rem_senior_spread_max",
-              "rem_senior_pct_cdi", "rem_senior_n", "rem_mez_spread_aa", "rem_mez_pct_cdi"):
+              "rem_senior_pct_cdi", "rem_senior_pre_aa", "rem_senior_n", "rem_mez_spread_aa", "rem_mez_pct_cdi",
+              "rem_mez_pre_aa"):
         f[c] = pd.to_numeric(f[c], errors="coerce").astype("float64")
     f["rem_lida"] = f["rem_lida"].astype("boolean")
     for c in ("valor_emitido", "spread_aa", "pct_cdi", "taxa_prefixada_aa"):
@@ -403,17 +406,18 @@ def build_table(con) -> None:
     con.register("_rs", s)
     con.register("_rf", f)
     con.execute("CREATE OR REPLACE TABLE rem_serie AS SELECT * FROM _rs")
-    # prometido na régua "CDI + x% a.a." (x% do CDI convertido com o CDI de mercado dos últimos 12 meses, capitalização diária
+    # prometido na régua "CDI + x% a.a." (x% do CDI e prefixado convertidos com o CDI de mercado dos últimos 12 meses, capitalização diária
     # base 252) x entregue (mediana mensal do excesso sobre o CDI no informe, anualizada); diferença em p.p. a.a.
-    eq = lambda sp, pc: f"""CASE WHEN {sp} IS NOT NULL THEN {sp}
+    eq = lambda sp, pc, pr: f"""CASE WHEN {sp} IS NOT NULL THEN {sp}
+        WHEN {pr} IS NOT NULL THEN (1 + {pr}) / (1 + k.cdi) - 1
         WHEN {pc} IS NOT NULL THEN power(1 + (power(1 + k.cdi, 1 / 252) - 1) * {pc}, 252) / (1 + k.cdi) - 1 END"""
     con.execute(f"""CREATE OR REPLACE TABLE rem_fundo AS
         WITH k AS (SELECT exp(sum(ln(1 + cdi_mes))) - 1 AS cdi FROM cdi_mes
                    WHERE dt > (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 12 MONTH
                      AND dt <= (SELECT ultimo_mes_completo FROM _meta)),
         b AS (
-            SELECT p.*, {eq("p.rem_senior_spread_aa", "p.rem_senior_pct_cdi")} AS rem_senior_alvo_aa,
-                   {eq("p.rem_mez_spread_aa", "p.rem_mez_pct_cdi")} AS rem_mez_alvo_aa,
+            SELECT p.*, {eq("p.rem_senior_spread_aa", "p.rem_senior_pct_cdi", "p.rem_senior_pre_aa")} AS rem_senior_alvo_aa,
+                   {eq("p.rem_mez_spread_aa", "p.rem_mez_pct_cdi", "p.rem_mez_pre_aa")} AS rem_mez_alvo_aa,
                    r.spread_senior_aa AS rem_senior_entregue_aa, r.spread_mezanino_aa AS rem_mez_entregue_aa
             FROM _rf p LEFT JOIN fundo_resumo r USING (cnpj) CROSS JOIN k)
         SELECT *, rem_senior_entregue_aa - rem_senior_alvo_aa AS rem_senior_gap_aa,

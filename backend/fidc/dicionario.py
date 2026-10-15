@@ -210,7 +210,7 @@ def _merge_catalogo() -> None:
         "rem_senior_doc": ("Documento da meta", "txt", "Onde a meta da sênior foi lida"),
         "rem_senior_data": ("Data do documento", "txt", ""),
         "rem_senior_alvo_aa": ("Sênior prometida (equiv. CDI +)", "pct",
-                               "Meta na régua CDI + x% a.a.; x% do CDI convertido com o CDI de mercado de 12 meses (base 252)"),
+                               "Meta na régua CDI + x% a.a.; x% do CDI e prefixado convertidos com o CDI de mercado de 12 meses (base 252)"),
         "rem_senior_entregue_aa": ("Sênior entregue (CDI +)", "pct",
                                    "Informe CVM: mediana do excesso mensal sobre o CDI, anualizada"),
         "rem_senior_gap_aa": ("Entregue − prometido (sênior)", "pct",

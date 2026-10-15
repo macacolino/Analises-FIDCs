@@ -28,7 +28,7 @@ export function RemuneracaoPrometida({ cnpj }: { cnpj: string }) {
       {r.rem_obs && (r.rem_senior_texto || r.rem_mez_texto) && <div className="muted">{r.rem_obs}</div>}
       <div className="muted" style={{ fontSize: 12 }}>
         Fonte: {r.rem_senior_doc ?? 'documentos do FNET'}{r.rem_senior_data ? ` de ${r.rem_senior_data}` : ''} · leitura por IA,
-        confiança {r.rem_confianca ?? '–'}. "x% do CDI" convertido para CDI + x com o CDI de mercado dos últimos 12 meses.
+        confiança {r.rem_confianca ?? '–'}. "x% do CDI" e prefixado convertidos para CDI + x com o CDI de mercado dos últimos 12 meses.
         Entregue = mediana do excesso mensal da sênior/mezanino sobre o CDI no informe, anualizada.
       </div>
       {series.length > 0 && <DataGrid title="Séries com meta" rows={series} id="rem-series" pinned={0}
