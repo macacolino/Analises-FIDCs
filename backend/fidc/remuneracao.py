@@ -246,7 +246,8 @@ Responda no JSON pedido, só com o que os trechos dizem:
   - spread_aa: sobretaxa em % ao ano como número (ex.: "Taxa DI + 3,50% a.a." -> 3.5). Para IPCA + x, também x.
     null se não houver.
   - pct_cdi: para "x% da Taxa DI", o x (ex.: 120). null se não for o caso.
-  - taxa_prefixada_aa: taxa fixa em % a.a. (ex.: 15.0). null se não for o caso.
+  - taxa_prefixada_aa: taxa fixa em % a.a. (ex.: 15.0). Se vier em % ao mês, anualize ((1 + m)^12 - 1; 3% a.m. ->
+    42.58) e deixe o texto original em formula. null se não for o caso.
   - formula: o texto literal curto da meta (ex.: "100% da Taxa DI acrescida de spread de 4,00% ao ano, base 252").
   - natureza: "meta_nao_garantida" (o texto diz meta/benchmark/alvo, sem garantia - o padrão de FIDC),
     "remuneracao_contratual" (o texto trata como remuneração devida/fixa), "nao_informado".
