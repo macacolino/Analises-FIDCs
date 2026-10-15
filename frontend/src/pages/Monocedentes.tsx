@@ -167,7 +167,7 @@ export default function Monocedentes() {
           {aba === 'calibracao' && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
             Exemplos passados pelo time. "Certo" = benefício tributário que é monocedente com faixa provável/possível, ou
             não-benefício fora disso. Na Oriz, só o MDR II é "não é" (fundo de recebíveis de cartão); Mundial e JPA Agro são benefício tributário.
-            Em 15/10 entraram como "não é": Latache (indício de fraude), Moto Honda II (veículos), Alpe (MCMS), Nexus,
+            Em 15/10 entraram como "não é" (o Marajó saiu dos positivos): Latache (indício de fraude), Moto Honda II (veículos), Alpe (MCMS), Nexus,
             Arcesp Consignado e TM4 (cedente instituição de pagamento).
           </div>}
         </div>
