@@ -389,8 +389,13 @@ def monocedentes(todos: bool = False, formato: str | None = None):
                       r.rentab_subordinada_12m_pct_cdi, r.taxa_desconto_aa, me.subordinacao, me.inad_90, me.pdd_carteira,
                       m.bt_nome_cedente, m.bt_sinais, m.bt_ia_sub, m.bt_ia_sub_nome, m.bt_ia_coobrigacao, m.bt_ia_indicio,
                       m.bt_ia_justificativa, m.bt_ia_trecho, m.bt_ia_pagina, m.bt_ia_cedente, m.bt_ia_objetivo,
-                      f.ultimo_informe
+                      f.ultimo_informe, rf.rem_lida, rf.rem_senior_texto, rf.rem_senior_indexador, rf.rem_senior_spread_aa,
+                      rf.rem_senior_spread_min, rf.rem_senior_spread_max, rf.rem_senior_pct_cdi, rf.rem_senior_n,
+                      rf.rem_senior_doc, rf.rem_senior_data, rf.rem_senior_alvo_aa, rf.rem_senior_entregue_aa, rf.rem_senior_gap_aa,
+                      r.rentab_senior_12m_pct_cdi, rf.rem_mez_texto, rf.rem_mez_spread_aa, rf.rem_mez_pct_cdi,
+                      rf.rem_mez_alvo_aa, rf.rem_mez_entregue_aa, rf.rem_mez_gap_aa, rf.rem_sub, rf.rem_confianca, rf.rem_obs
                FROM mono_fundo m JOIN fundo f USING (cnpj)
+               LEFT JOIN rem_fundo rf ON rf.cnpj = f.cnpj
                LEFT JOIN metricas_mes me ON me.cnpj = f.cnpj AND me.dt = f.ultimo_informe
                LEFT JOIN fundo_resumo r ON r.cnpj = f.cnpj
                WHERE {filtro} AND f.ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH
@@ -405,6 +410,15 @@ def monocedentes(todos: bool = False, formato: str | None = None):
 def monocedente_grupos(cnpj: str):
     """Cedentes do fundo agrupados por grupo econômico (raiz do CNPJ, sócios em comum, mesmo nome)."""
     return df("SELECT * FROM mono_grupo WHERE cnpj = ? ORDER BY ordem", [re.sub(r"\D", "", cnpj)]).to_dict("records")
+
+
+@router.get("/fundos/{cnpj}/remuneracao")
+def remuneracao_fundo(cnpj: str):
+    """Remuneração prometida por série (documentos do FNET lidos por IA) e o resumo prometido x entregue."""
+    c = re.sub(r"\D", "", cnpj)
+    s = df("SELECT * FROM rem_serie WHERE cnpj = ? ORDER BY ordem", [c])
+    f = df("SELECT * FROM rem_fundo WHERE cnpj = ?", [c])
+    return _clean({"series": s.to_dict("records"), "resumo": f.to_dict("records")[0] if len(f) else None})
 
 
 @router.get("/consultorias")

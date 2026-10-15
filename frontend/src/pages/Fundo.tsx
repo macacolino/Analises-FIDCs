@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { send, useApi, useDic, useTaxonomia, type Row } from '../api'
 import { Bars, TimeLines } from '../components/Charts'
+import { RemuneracaoPrometida } from '../components/Remuneracao'
 import { DataGrid } from '../components/DataGrid'
 import { Alertas, Kpi, Loading, Tabs, type Alerta } from '../components/ui'
 import ComparePanel, { defaultPeers, PeerSelector, RedFlagChip, type PeerOpts } from '../components/Comparar'
@@ -127,7 +128,7 @@ export default function Fundo() {
       <div className="card">
         <Tabs value={tab} onChange={setTab} options={[
           ['pares', 'Vs. pares'], ['geral', 'Evolução'], ['casa', 'Métricas da casa'], ['safra', 'Safras e proxies'],
-          ['stress', 'Stress'], ['carteira', 'Carteira e cedentes'], ['series', 'Séries'], ['qualidade', 'Qualidade do dado'],
+          ['stress', 'Stress'], ['carteira', 'Carteira e cedentes'], ['series', 'Séries e remuneração'], ['qualidade', 'Qualidade do dado'],
           ['regulamento', 'Regulamento e gestor'], ['roteiro', 'Roteiro de DD'], ['eventos', 'Eventos FNET'],
           ['notas', `Notas (${lam.data.notas.length})`]]} />
         {tab === 'pares' && (
@@ -201,9 +202,15 @@ export default function Fundo() {
           </div>
         )}
         {tab === 'series' && (
-          <DataGrid rows={lam.data.series} height={360} exportUrl={`/api/fundos/${cnpj}/series`}
-            cols={['serie', 'tipo', 'pl_serie', 'valor_cota', 'rentab_mes', 'rentab_12m', 'desempenho_esperado',
-                   'desempenho_real', 'nr_cotistas']} />
+          <div className="stack">
+            <div className="card stack" style={{ gap: 6 }}>
+              <h3 style={{ margin: 0 }}>Remuneração prometida × entregue</h3>
+              <RemuneracaoPrometida cnpj={cnpj} />
+            </div>
+            <DataGrid title="Séries no informe CVM" rows={lam.data.series} height={360} exportUrl={`/api/fundos/${cnpj}/series`}
+              cols={['serie', 'tipo', 'pl_serie', 'valor_cota', 'rentab_mes', 'rentab_12m', 'desempenho_esperado',
+                     'desempenho_real', 'nr_cotistas']} />
+          </div>
         )}
         {tab === 'eventos' && (
           <div className="stack" style={{ gap: 6 }}>

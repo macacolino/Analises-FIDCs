@@ -4,19 +4,27 @@ import { useApi, type Row } from '../api'
 import { DataGrid, type Visao } from '../components/DataGrid'
 import { Loading, Tabs } from '../components/ui'
 import { fmtValue } from '../fmt'
+import { RemuneracaoPrometida } from '../components/Remuneracao'
 
-type Aba = 'bt' | 'universo' | 'calibracao'
+type Aba = 'bt' | 'remuneracao' | 'universo' | 'calibracao'
 
 const COLS = ['nome', 'bt_score', 'bt_faixa', 'bt_estagio', 'bt_meses_estagio1', 'mono_grupo', 'mono_grupo_atividade',
   'mono_conc_grupo',
-  'mono_grupo_cnpjs', 'pl', 'nr_cotistas', 'estrutura', 'taxa_gestao', 'spread_senior_aa', 'rentab_subordinada_12m_pct_cdi',
+  'mono_grupo_cnpjs', 'pl', 'nr_cotistas', 'estrutura', 'taxa_gestao', 'rem_senior_texto', 'rem_senior_alvo_aa', 'spread_senior_aa',
+  'rem_senior_gap_aa', 'rentab_subordinada_12m_pct_cdi',
   'bt_ia_sub', 'bt_ia_indicio', 'gestor', 'admin', 'categoria_nome', 'bt_rotulo', 'bt_sinais']
+const COLS_REM = ['nome', 'rem_senior_texto', 'rem_senior_alvo_aa', 'rem_senior_entregue_aa', 'rem_senior_gap_aa', 'rem_senior_n',
+  'rentab_senior_12m_pct_cdi', 'rem_mez_texto', 'rem_mez_alvo_aa', 'rem_mez_gap_aa', 'bt_faixa', 'pl', 'gestor', 'rem_senior_doc',
+  'rem_senior_data', 'rem_confianca']
 const VISOES: Visao[] = [
   { nome: 'Triagem', cols: ['bt_score', 'bt_faixa', 'bt_estagio', 'mono_grupo', 'pl', 'nr_cotistas', 'taxa_gestao', 'gestor', 'bt_sinais'] },
   { nome: 'Estrutura', cols: ['bt_estagio', 'bt_meses_estagio1', 'bt_inicio', 'estrutura', 'nr_cotistas', 'cotistas_senior',
     'cotistas_subordinada', 'subordinacao', 'pl'] },
   { nome: 'Economia', cols: ['bt_score', 'taxa_gestao', 'taxa_administracao', 'spread_senior_aa', 'rentab_subordinada_12m_pct_cdi',
     'taxa_desconto_aa', 'inad_90', 'pdd_carteira'] },
+  { nome: 'Remuneração', cols: ['bt_faixa', 'pl', 'rem_senior_texto', 'rem_senior_alvo_aa', 'rem_senior_entregue_aa',
+    'rem_senior_gap_aa', 'rem_senior_n', 'rentab_senior_12m_pct_cdi', 'rem_mez_texto', 'rem_mez_alvo_aa', 'rem_mez_entregue_aa',
+    'rem_mez_gap_aa', 'rem_senior_doc', 'rem_senior_data', 'rem_confianca'] },
   { nome: 'Regulamento', cols: ['bt_score', 'bt_ia_sub', 'bt_ia_sub_nome', 'bt_ia_coobrigacao', 'bt_ia_indicio',
     'bt_ia_justificativa', 'bt_ia_cedente'] },
   { nome: 'Cedente', cols: ['mono_grupo', 'mono_grupo_cnpjs', 'mono_conc_grupo', 'mono_conc_carteira', 'mono_cedentes_informados',
@@ -53,6 +61,10 @@ function Detalhe({ f, onFechar }: { f: Row; onFechar: () => void }) {
             “{f.bt_ia_trecho}”{f.bt_ia_pagina ? ` (p. ${f.bt_ia_pagina})` : ''}</blockquote>}
         </div>
       )}
+      <div className="stack" style={{ gap: 4 }}>
+        <b>Remuneração prometida (documentos do FNET)</b>
+        <RemuneracaoPrometida cnpj={f.cnpj} />
+      </div>
       <Loading q={g} />
       {g.data && <DataGrid title="Cedentes por grupo econômico" rows={g.data} id="mono-grupos" pinned={0}
         cols={['ordem', 'grupo', 'atividade', 'cnae', 'n_cnpjs', 'pct_carteira', 'pct_informados', 'cnpjs']} />}
@@ -73,7 +85,9 @@ export default function Monocedentes() {
   const grandes = useMemo(() => universo.filter((r) => r.bt_faixa === 'excluído (grande empresa)'), [universo])
   const financ = useMemo(() => universo.filter((r) => r.bt_faixa === 'excluído (cedente financeiro)' || r.bt_faixa === 'excluído (cedente público)'), [universo])
   const calib = useMemo(() => dados.filter((r) => r.bt_rotulo), [dados])
-  const linhas = aba === 'universo' ? dados : aba === 'calibracao' ? calib : bt
+  const rem = useMemo(() => universo.filter((r) => !String(r.bt_faixa ?? '').startsWith('excluído')), [universo])
+  const comMeta = rem.filter((r) => r.rem_senior_texto || r.rem_mez_texto)
+  const linhas = aba === 'universo' ? dados : aba === 'calibracao' ? calib : aba === 'remuneracao' ? rem : bt
   const soma = (rs: Row[]) => rs.reduce((a, r) => a + (r.pl ?? 0), 0)
   const est = (n: number) => bt.filter((r) => r.bt_estagio === n).length
   const atual = dados.find((r) => r.cnpj === sel)
@@ -110,17 +124,20 @@ export default function Monocedentes() {
             <div className="c">banco, SCD/bancarizadora, securitizadora, meios de pagamento, ente público</div></div>
           <div className="kpi"><div className="l">Excluídos: cedente grande empresa</div><div className="v">{grandes.length}</div>
             <div className="c">S.A. aberta ou capital ≥ R$ 1 bi (cativo, fornecedores...)</div></div>
+          <div className="kpi"><div className="l">Remuneração prometida lida</div>
+            <div className="v">{comMeta.length}/{rem.length}</div>
+            <div className="c">com meta numérica · {rem.filter((r) => r.rem_lida).length} lidos</div></div>
           <div className="kpi"><div className="l">Calibração</div><div className="v">{acertos}/{calib.length}</div>
             <div className="c">exemplos do time classificados certo</div></div>
         </div>
       )}
       <Tabs value={aba} onChange={(a) => set('aba', a === 'bt' ? null : a)}
-        options={[['bt', `Benefício tributário (${bt.length})`], ['universo', `Universo + categoria monocedente (${dados.length})`],
+        options={[['bt', `Benefício tributário (${bt.length})`], ['remuneracao', `Prometido × entregue (${rem.length})`], ['universo', `Universo + categoria monocedente (${dados.length})`],
                   ['calibracao', `Calibração (${calib.length})`]]} />
       {q.data && (
         <div className="card">
           <DataGrid rows={linhas} id={`mono-${aba}`} height={600} visoes={VISOES} exportUrl="/api/monocedentes?todos=true"
-            cols={COLS.map((c) => c === 'nome' ? {
+            cols={(aba === 'remuneracao' ? COLS_REM : COLS).map((c) => c === 'nome' ? {
               field: 'nome', minWidth: 300, cellRenderer: (p: any) => (
                 <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
                   <button className="ghost" style={{ padding: '0 6px', minHeight: 24, fontSize: 12 }} title="Ver sinais, leitura do regulamento e cedentes"
@@ -133,7 +150,7 @@ export default function Monocedentes() {
             } : c)} />
           {aba === 'calibracao' && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
             Exemplos passados pelo time. "Certo" = benefício tributário que é monocedente com faixa provável/possível, ou
-            não-benefício fora disso. Os fundos da Oriz entraram todos como "não é" (gestora inteira) — confirmar os que pontuam alto.
+            não-benefício fora disso. Na Oriz, só o MDR II é "não é" (fundo de recebíveis de cartão); Mundial e JPA Agro são benefício tributário.
           </div>}
         </div>
       )}

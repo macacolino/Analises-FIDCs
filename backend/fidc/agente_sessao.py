@@ -41,6 +41,18 @@ for c in (r.get("campos", []) if "campos" in props else []):
     if isinstance(c["valor"], str): erros.append(f"{c['campo']}: valor numérico ou null (texto em valor_txt)")
     elif c["valor"] is not None and c["campo"] != "prazo_resgate_dias" and not 0 <= c["valor"] <= 2:
         erros.append(f"{c['campo']}: percentual como fração, veio {c['valor']}")
+si = props.get("series", {}).get("items", {})
+for x in (r.get("series") or [] if si else []):
+    if set(x) != set(si["required"]):
+        erros.append(f"série com chaves erradas: faltam {set(si['required']) - set(x)}, sobram {set(x) - set(si['required'])}"); continue
+    for k, p in si["properties"].items():
+        if "enum" in p and x.get(k) not in p["enum"]: erros.append(f"série {k} fora do enum: {x.get(k)}")
+    for k in ("spread_aa", "pct_cdi", "taxa_prefixada_aa", "valor_emitido"):
+        if x.get(k) is not None and not isinstance(x[k], (int, float)): erros.append(f"série {k}: número ou null, veio {x[k]!r}")
+    if isinstance(x.get("spread_aa"), (int, float)) and 0 < abs(x["spread_aa"]) < 0.2:
+        erros.append(f"série spread_aa em % a.a. (3,5% -> 3.5), não fração: {x['spread_aa']}")
+    if isinstance(x.get("pct_cdi"), (int, float)) and 0 < x["pct_cdi"] < 5:
+        erros.append(f"série pct_cdi em % (120% do CDI -> 120): {x['pct_cdi']}")
 if j.get("cnpj") not in open(f"{D}/lista_{nn}.txt").read().split():
     erros.append(f"CNPJ {j.get('cnpj')} não está na lista_{nn}")
 if erros:
@@ -266,13 +278,15 @@ def _completo(paginas: list[str]) -> str:
 
 
 def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = None, completo: bool = False,
-             taxas: bool = False, pdd: bool = False, consultoria: bool = False, mono: bool = False) -> int:
+             taxas: bool = False, pdd: bool = False, consultoria: bool = False, mono: bool = False,
+             remuneracao: bool = False) -> int:
     """Monta o lote. `cnpjs` força a lista (auditoria); `completo` manda o regulamento inteiro em vez de trechos;
     `taxas` faz a passada só de taxas (fila própria, trechos curtos, schema reduzido); `pdd` lê a nota de PDD das
     demonstrações financeiras (pdd_docs)."""
     from . import consultoria as cs
     from . import mono_ia
     from . import pdd_docs as pd_
+    from . import remuneracao as rm
     base = Path(d)
     (base / "in").mkdir(parents=True, exist_ok=True)
     (base / "out").mkdir(exist_ok=True)
@@ -281,7 +295,7 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
         nomes = dict(df("SELECT cnpj, nome FROM fundo").values)
         itens = [(c, nomes.get(c, "")) for c in cnpjs]
     else:
-        itens = mono_ia.fila(limite) if mono else cs.fila(limite) if consultoria else pd_.fila(limite) if pdd \
+        itens = rm.fila(limite, todos=True) if remuneracao else mono_ia.fila(limite) if mono else cs.fila(limite) if consultoria else pd_.fila(limite) if pdd \
             else fila_taxas(limite) if taxas else fila(limite)
     if pdd:     # baixa as demonstrações financeiras que ainda não foram buscadas
         con = pd_.db()
@@ -290,6 +304,13 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
         falta = [c for c, _ in itens if c not in feitos]
         if falta:
             print(json.dumps({"busca_demonstracoes": pd_.rodar(falta)}))
+    if remuneracao:   # baixa do FNET as páginas com remuneração de quem ainda não foi buscado
+        con = rm.db()
+        feitos = {c for (c,) in con.execute("SELECT cnpj FROM rem_doc")}
+        con.close()
+        falta = [c for c, _ in itens if c not in feitos]
+        if falta:
+            print(json.dumps({"busca_remuneracao": rm.rodar(falta)}))
     if taxas:   # garante que cada fundo já passou pela busca do documento com taxa no FNET
         from . import taxas_docs as td
         con = td.db()
@@ -300,8 +321,8 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
             print(json.dumps({"busca_documentos": td.rodar(falta)}))
     ok = []
     for cnpj, nome in itens:
-        if pdd or consultoria or mono:
-            t = (pd_ if pdd else mono_ia if mono else cs).texto(cnpj)
+        if pdd or consultoria or mono or remuneracao:
+            t = (pd_ if pdd else mono_ia if mono else rm if remuneracao else cs).texto(cnpj)
             if t:
                 (base / "in" / f"{cnpj}.txt").write_text(f"Fundo: {nome} (CNPJ {cnpj})\n\n{t}")
                 ok.append(cnpj)
@@ -331,14 +352,15 @@ def preparar(limite: int, d: str, tamanho: int = 25, cnpjs: list[str] | None = N
         os.remove(f)
     for i in range(k):
         (base / f"lista_{i:02d}.txt").write_text("\n".join(ok[i::k]))
-    spec = {"instrucoes": mono_ia.INSTRUCOES, "schema": mono_ia.SCHEMA, "modo": "mono"} if mono else \
+    spec = {"instrucoes": rm.INSTRUCOES, "schema": rm.SCHEMA, "modo": "remuneracao"} if remuneracao else \
+        {"instrucoes": mono_ia.INSTRUCOES, "schema": mono_ia.SCHEMA, "modo": "mono"} if mono else \
         {"instrucoes": cs.INSTRUCOES, "schema": cs.SCHEMA, "modo": "consultoria"} if consultoria else \
         {"instrucoes": pd_.INSTRUCOES, "schema": pd_.SCHEMA, "modo": "pdd"} if pdd else \
         {"instrucoes": INSTRUCOES_TAXAS, "schema": SCHEMA_TAXAS, "modo": "taxas"} if taxas else \
         {"instrucoes": ag.INSTRUCOES, "schema": ag.SCHEMA}
     (base / "spec.json").write_text(json.dumps(spec, ensure_ascii=False))
     (base / "gravar.py").write_text(GRAVAR)
-    prompt = mono_ia.PROMPT if mono else cs.PROMPT if consultoria else pd_.PROMPT if pdd else PROMPT_TAXAS if taxas else PROMPT
+    prompt = rm.PROMPT if remuneracao else mono_ia.PROMPT if mono else cs.PROMPT if consultoria else pd_.PROMPT if pdd else PROMPT_TAXAS if taxas else PROMPT
     (base / "PROMPT.md").write_text(prompt.format(dir=str(base.resolve())) + (COMPLETO if completo else ""))
     print(json.dumps({"fundos": len(ok), "partes": k if ok else 0, "dir": str(base.resolve())}))
     return k if ok else 0
@@ -359,7 +381,8 @@ def importar(d: str) -> dict:
                 continue
             vistos.add(c)
             src = norm((base / "in" / f"{c}.txt").read_text())
-            tr = [x["trecho"] for x in j["resultado"].get("campos", []) if len(x.get("trecho") or "") > 40]
+            tr = [x["trecho"] for x in (j["resultado"].get("campos") or j["resultado"].get("series") or [])
+                  if len(x.get("trecho") or "") > 40]
             achou = sum(1 for t in tr if norm(t)[5:45] in src or any(
                 norm(p)[:40] in src for p in re.split(r"\.\.\.|…", t) if len(norm(p)) >= 40))
             if len(tr) >= 2 and achou == 0:      # trechos de outro documento: não importa
@@ -369,6 +392,9 @@ def importar(d: str) -> dict:
     arq = base / "validos.jsonl"
     arq.write_text("".join(linhas), encoding="utf-8")
     spec = json.loads((base / "spec.json").read_text())
+    if spec.get("modo") == "remuneracao":
+        from . import remuneracao
+        return {**remuneracao.importar(linhas), "suspeitos_descartados": suspeitos}
     if spec.get("modo") == "mono":
         from . import mono_ia
         return {**mono_ia.importar(linhas), "suspeitos_descartados": suspeitos}
@@ -426,15 +452,17 @@ def main():
     ap.add_argument("--pdd", action="store_true", help="política de PDD das demonstrações financeiras")
     ap.add_argument("--consultoria", action="store_true", help="consultoria de crédito e agente de cobrança")
     ap.add_argument("--mono", action="store_true", help="estrutura de monocedentes (benefício tributário)")
+    ap.add_argument("--remuneracao", action="store_true", help="remuneração prometida por série (monocedentes primeiro)")
+    ap.add_argument("--so-mono", action="store_true", help="com --remuneracao: só o universo monocedente")
     a = ap.parse_args()
     if a.acao == "preparar":
         cs = open(a.cnpjs).read().split() if a.cnpjs else None
-        preparar(a.limite, a.dir, a.tamanho, cs, a.completo, a.taxas, a.pdd, a.consultoria, a.mono)
+        preparar(a.limite, a.dir, a.tamanho, cs, a.completo, a.taxas, a.pdd, a.consultoria, a.mono, a.remuneracao)
     elif a.acao == "importar":
         print(json.dumps(importar(a.dir), ensure_ascii=False))
     else:
-        from . import consultoria, mono_ia, pdd_docs
-        print(len(mono_ia.fila(100000) if a.mono else consultoria.fila(100000) if a.consultoria else pdd_docs.fila(100000) if a.pdd
+        from . import consultoria, mono_ia, pdd_docs, remuneracao
+        print(len(remuneracao.fila(100000, not a.so_mono) if a.remuneracao else mono_ia.fila(100000) if a.mono else consultoria.fila(100000) if a.consultoria else pdd_docs.fila(100000) if a.pdd
                   else fila_taxas(100000) if a.taxas else fila(100000)))
 
 
