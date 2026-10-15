@@ -92,7 +92,7 @@ def _receitaws(c: str, cli: httpx.Client) -> dict | None:
     }
 
 
-def fila(limite: int = 100000) -> list[str]:
+def fila(limite: int = 100000, todos: bool = False) -> list[str]:
     """CNPJs de cedentes ainda sem cadastro: primeiro os de fundos concentrados (maior grupo de CNPJ >= 25% dos
     cedentes informados), monocedente antes, por PL; depois o resto."""
     import duckdb
@@ -115,6 +115,8 @@ def fila(limite: int = 100000) -> list[str]:
                                           "AND k.dt = f.ultimo_informe WHERE k.cnpj IN (SELECT unnest(?))", [list(rot)]).fetchall()}
     except Exception:  # noqa: BLE001
         prim = set()
+    if not todos:   # foco: cedentes de fundos concentrados (os de fundos pulverizados não mudam a análise)
+        linhas = [x for x in linhas if x[1] <= 1]
     ordem = [c for c, _, _ in linhas if c in prim] + [c for c, _, _ in linhas if c not in prim]
     return [c for c in ordem if c not in feitos][:limite]
 
