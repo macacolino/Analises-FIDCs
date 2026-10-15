@@ -16,6 +16,7 @@ import argparse
 import gzip
 import json
 import logging
+import re
 import sqlite3
 import time
 from datetime import datetime
@@ -117,7 +118,18 @@ def fila(limite: int = 100000, todos: bool = False) -> list[str]:
         prim = set()
     if not todos:   # foco: cedentes de fundos concentrados (os de fundos pulverizados não mudam a análise)
         linhas = [x for x in linhas if x[1] <= 1]
-    ordem = [c for c, _, _ in linhas if c in prim] + [c for c, _, _ in linhas if c not in prim]
+    # consultorias de crédito dos fundos concentrados (para ver se são do grupo do cedente)
+    try:
+        cons = [(re.sub(r"\D", "", c), 1, pl) for c, pl in con.execute("""
+            SELECT c.consultoria_cnpj, max(f.pl) FROM consultoria_fundo c JOIN fundo f USING (cnpj)
+            JOIN mono_fundo m USING (cnpj)
+            WHERE c.consultoria_cnpj IS NOT NULL AND (m.monocedente OR f.categoria = 'monocedente_comercial')
+            GROUP BY 1""").fetchall()]
+        prim |= {c for c, _, _ in cons}
+        linhas = cons + linhas
+    except Exception:  # noqa: BLE001 - base sem consultoria/mono
+        pass
+    ordem = list(dict.fromkeys([c for c, _, _ in linhas if c in prim] + [c for c, _, _ in linhas if c not in prim]))
     return [c for c in ordem if c not in feitos][:limite]
 
 

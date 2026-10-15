@@ -10,7 +10,8 @@ type Aba = 'bt' | 'remuneracao' | 'universo' | 'calibracao'
 
 const COLS = ['nome', 'bt_score', 'bt_faixa', 'bt_estagio', 'bt_meses_estagio1', 'mono_grupo', 'mono_grupo_atividade',
   'mono_conc_grupo',
-  'mono_grupo_cnpjs', 'pl', 'nr_cotistas', 'estrutura', 'taxa_gestao', 'rem_senior_texto', 'rem_senior_alvo_aa', 'spread_senior_aa',
+  'mono_grupo_cnpjs', 'pl', 'nr_cotistas', 'estrutura', 'taxa_gestao', 'taxa_gestao_min_mes', 'taxa_administracao_min_mes',
+  'consultoria', 'consultoria_tipo', 'rem_senior_texto', 'rem_senior_alvo_aa', 'spread_senior_aa',
   'rem_senior_gap_aa', 'rentab_subordinada_12m_pct_cdi',
   'bt_ia_sub', 'bt_ia_indicio', 'gestor', 'admin', 'categoria_nome', 'bt_rotulo', 'bt_sinais']
 const COLS_REM = ['nome', 'rem_senior_texto', 'rem_senior_alvo_aa', 'rem_senior_entregue_aa', 'rem_senior_gap_aa', 'rem_senior_n',
@@ -20,11 +21,15 @@ const VISOES: Visao[] = [
   { nome: 'Triagem', cols: ['bt_score', 'bt_faixa', 'bt_estagio', 'mono_grupo', 'pl', 'nr_cotistas', 'taxa_gestao', 'gestor', 'bt_sinais'] },
   { nome: 'Estrutura', cols: ['bt_estagio', 'bt_meses_estagio1', 'bt_inicio', 'estrutura', 'nr_cotistas', 'cotistas_senior',
     'cotistas_subordinada', 'subordinacao', 'pl'] },
-  { nome: 'Economia', cols: ['bt_score', 'taxa_gestao', 'taxa_administracao', 'spread_senior_aa', 'rentab_subordinada_12m_pct_cdi',
+  { nome: 'Economia', cols: ['bt_score', 'taxa_gestao', 'taxa_gestao_min_mes', 'taxa_administracao', 'taxa_administracao_min_mes',
+    'consultoria_taxa_aa', 'consultoria_taxa_min_mes', 'spread_senior_aa', 'rentab_subordinada_12m_pct_cdi',
     'taxa_desconto_aa', 'inad_90', 'pdd_carteira'] },
   { nome: 'Remuneração', cols: ['bt_faixa', 'pl', 'rem_senior_texto', 'rem_senior_alvo_aa', 'rem_senior_entregue_aa',
     'rem_senior_gap_aa', 'rem_senior_n', 'rentab_senior_12m_pct_cdi', 'rem_mez_texto', 'rem_mez_alvo_aa', 'rem_mez_entregue_aa',
     'rem_mez_gap_aa', 'rem_senior_doc', 'rem_senior_data', 'rem_confianca'] },
+  { nome: 'Consultoria', cols: ['bt_faixa', 'pl', 'consultoria', 'consultoria_tipo', 'consultoria_n_fundos',
+    'mono_consultoria_ligada', 'consultoria_relacionada', 'consultoria_taxa_txt', 'consultoria_taxa_aa', 'consultoria_taxa_min_mes',
+    'consultoria_paga_por', 'mono_consultoria_atividade', 'mono_consultoria_abertura', 'mono_grupo', 'gestor'] },
   { nome: 'Regulamento', cols: ['bt_score', 'bt_ia_sub', 'bt_ia_sub_nome', 'bt_ia_coobrigacao', 'bt_ia_indicio',
     'bt_ia_justificativa', 'bt_ia_cedente'] },
   { nome: 'Cedente', cols: ['mono_grupo', 'mono_grupo_cnpjs', 'mono_conc_grupo', 'mono_conc_carteira', 'mono_cedentes_informados',
@@ -61,6 +66,15 @@ function Detalhe({ f, onFechar }: { f: Row; onFechar: () => void }) {
             “{f.bt_ia_trecho}”{f.bt_ia_pagina ? ` (p. ${f.bt_ia_pagina})` : ''}</blockquote>}
         </div>
       )}
+      {f.consultoria && <div className="stack" style={{ gap: 4 }}>
+        <b>Consultoria de crédito</b>
+        <div>{f.consultoria}{f.consultoria_cnpj ? ` (${f.consultoria_cnpj})` : ''} · <b>{f.consultoria_tipo ?? '–'}</b>
+          {f.consultoria_n_fundos ? ` · ${f.consultoria_n_fundos} FIDC(s) ativo(s)` : ''}
+          {f.mono_consultoria_ligada && <> · <b style={{ color: 'var(--critical)' }}>{f.mono_consultoria_ligada}</b></>}</div>
+        <div className="muted">Taxa: {f.consultoria_taxa_txt ?? 'não lida'}{f.consultoria_paga_por ? ` · paga por: ${String(f.consultoria_paga_por).replaceAll('_', ' ')}` : ''}
+          {f.mono_consultoria_atividade ? ` · Receita: ${f.mono_consultoria_atividade}` : ''}
+          {f.mono_consultoria_abertura ? ` · aberta em ${f.mono_consultoria_abertura}` : ''}</div>
+      </div>}
       <div className="stack" style={{ gap: 4 }}>
         <b>Remuneração prometida (documentos do FNET)</b>
         <RemuneracaoPrometida cnpj={f.cnpj} />

@@ -40,13 +40,19 @@ SCHEMA = {
         "consultoria_nome": _txt, "consultoria_cnpj": _txt,
         "consultoria_relacionada": _bool, "relacionada_com": _txt,
         "agente_cobranca_nome": _txt, "agente_cobranca_cnpj": _txt,
+        "taxa_consultoria_texto": _txt,
+        "taxa_consultoria_aa": {"anyOf": [{"type": "number"}, {"type": "null"}]},
+        "taxa_consultoria_min_mes": {"anyOf": [{"type": "number"}, {"type": "null"}]},
+        "taxa_consultoria_paga_por": {"type": "string", "enum": ["classe_encargo", "taxa_de_gestao", "cedente_ou_outro",
+                                                                 "nao_informado"]},
         "pagina": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
         "trecho": {"type": "string"},
         "confianca": {"type": "string", "enum": ["alta", "media", "baixa"]},
         "observacoes": {"type": "string"},
     },
     "required": ["situacao", "consultoria_nome", "consultoria_cnpj", "consultoria_relacionada", "relacionada_com",
-                 "agente_cobranca_nome", "agente_cobranca_cnpj", "pagina", "trecho", "confianca", "observacoes"],
+                 "agente_cobranca_nome", "agente_cobranca_cnpj", "taxa_consultoria_texto", "taxa_consultoria_aa",
+                 "taxa_consultoria_min_mes", "taxa_consultoria_paga_por", "pagina", "trecho", "confianca", "observacoes"],
     "additionalProperties": False,
 }
 INSTRUCOES = """Você é analista de crédito estruturado e lê trechos do regulamento de um FIDC, com páginas marcadas como
@@ -64,6 +70,15 @@ INSTRUCOES = """Você é analista de crédito estruturado e lê trechos do regul
 - relacionada_com: com quem ("cedente", "gestora", "originador", nome) ou null.
 - agente_cobranca_nome / agente_cobranca_cnpj: agente de cobrança contratado (cobrança extraordinária dos
   inadimplidos), se nomeado; null se não.
+- taxa_consultoria_texto: como a consultoria é remunerada, texto literal curto (ex.: "0,50% a.a. sobre o PL, mínimo
+  mensal de R$ 15.000,00"); null se os trechos não dizem.
+- taxa_consultoria_aa: percentual ao ano como FRAÇÃO (0,50% a.a. -> 0.005); se vier ao mês, anualize multiplicando por
+  12; null se for só valor fixo ou não houver.
+- taxa_consultoria_min_mes: piso/valor fixo mensal em R$ (número; "R$ 15 mil" -> 15000); valor anual divida por 12;
+  null se não houver.
+- taxa_consultoria_paga_por: "classe_encargo" (paga pelo fundo/classe, como encargo ou taxa própria),
+  "taxa_de_gestao" (sai da taxa de gestão/administração, sem custo extra ao fundo), "cedente_ou_outro" (paga pela
+  cedente ou por terceiro), "nao_informado".
 - pagina e trecho: página e trecho literal curto (até 300 caracteres) que sustenta a consultoria (ou a ausência).
 - confianca: baixa se você inferiu; media se o texto é ambíguo; alta se a definição é explícita.
 - observacoes: até 2 frases (ex.: mais de uma consultora, consultora substituída, consultora = cedente)."""
@@ -84,7 +99,8 @@ trabalham em paralelo na mesma pasta.
 """
 
 _ROT = re.compile(r"consultor[ae]?s?\s+(?:especializad[ao]s?|de\s+cr[eé]dito)", re.I)
-_PAG = [_ROT, re.compile(r"agente\s+de\s+cobran[cç]a", re.I), re.compile(r"consultoria\s+especializada", re.I)]
+_PAG = [_ROT, re.compile(r"agente\s+de\s+cobran[cç]a", re.I), re.compile(r"consultoria\s+especializada", re.I),
+        re.compile(r"(taxa|remunera[cç][ãa]o)\s+d[ae]\s+consult|consultor[ae]?s?\s+(especializad[ao]s?\s+)?far[áa]\s+jus", re.I)]
 _EMP = re.compile(r"((?:[A-ZÀ-Ü0-9&][A-ZÀ-Ü0-9&\.\-’']*\s+){1,10}?(?:LTDA\.?|S\.?\s?A\.?|EIRELI|S/A))")
 _CNPJ = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
 
@@ -189,7 +205,9 @@ def fila(limite: int) -> list[tuple[str, str]]:
     con = db()
     r = dict(con.execute("SELECT cnpj, origem || '|' || json_extract(resultado, '$.situacao') FROM reg_consultoria"))
     con.close()
-    pend = [c for c, v in r.items() if not v.startswith("revisao") and not v.endswith("nao_encontrado")]
+    novos = {c for (c,) in db().execute("SELECT cnpj FROM reg_consultoria WHERE origem = 'revisao na sessao' "
+                                        "AND json_extract(resultado, '$.taxa_consultoria_paga_por') IS NOT NULL")}
+    pend = [c for c, v in r.items() if c not in novos and not v.endswith("nao_encontrado")]
     if not pend:
         return []
     u = df("SELECT cnpj, nome, pl FROM fundo WHERE cnpj IN (SELECT unnest(?))", [pend])
@@ -251,7 +269,11 @@ def build_table(con) -> None:
                     "agente_cobranca_cnpj": _cnpj_fmt(x.get("agente_cobranca_cnpj")),
                     "consultoria_origem": "IA" if r["origem"] == "revisao na sessao" else "regras",
                     "consultoria_confianca": x.get("confianca"), "consultoria_trecho": x.get("trecho"),
-                    "consultoria_pagina": x.get("pagina")})
+                    "consultoria_pagina": x.get("pagina"),
+                    "consultoria_taxa_txt": x.get("taxa_consultoria_texto"),
+                    "consultoria_taxa_aa": x.get("taxa_consultoria_aa"),
+                    "consultoria_taxa_min_mes": x.get("taxa_consultoria_min_mes"),
+                    "consultoria_paga_por": x.get("taxa_consultoria_paga_por")})
     # mesma consultoria lida com e sem CNPJ: usa o CNPJ conhecido para o nome
     por_nome = {o["consultoria"]: o["consultoria_cnpj"] for o in out if o["consultoria"] and o["consultoria_cnpj"]}
     for o in out:
@@ -260,11 +282,26 @@ def build_table(con) -> None:
             o["consultoria_chave"] = re.sub(r"\D", "", o["consultoria_cnpj"])
     cols = ["cnpj", "consultoria_situacao", "consultoria", "consultoria_cnpj", "consultoria_chave",
             "consultoria_relacionada", "consultoria_relacionada_com", "agente_cobranca", "agente_cobranca_cnpj",
-            "consultoria_origem", "consultoria_confianca", "consultoria_trecho", "consultoria_pagina"]
-    con.register("_c", pd.DataFrame(out, columns=cols))
-    txt = ", ".join(f"CAST({c} AS VARCHAR) AS {c}" for c in cols if c != "consultoria_pagina")
-    con.execute(f"CREATE OR REPLACE TABLE consultoria_fundo AS SELECT {txt}, CAST(consultoria_pagina AS INTEGER) "
-                "AS consultoria_pagina FROM _c")
+            "consultoria_origem", "consultoria_confianca", "consultoria_trecho", "consultoria_pagina",
+            "consultoria_taxa_txt", "consultoria_taxa_aa", "consultoria_taxa_min_mes", "consultoria_paga_por"]
+    num = {"consultoria_pagina": "INTEGER", "consultoria_taxa_aa": "DOUBLE", "consultoria_taxa_min_mes": "DOUBLE"}
+    d = pd.DataFrame(out, columns=cols)
+    for c in num:
+        d[c] = pd.to_numeric(d[c], errors="coerce").astype("float64")
+    con.register("_c", d)
+    txt = ", ".join(f"CAST({c} AS {num.get(c, 'VARCHAR')}) AS {c}" for c in cols)
+    # consultoria "de mercado" = atende outro FIDC ativo além deste; "de apoio" = só aparece neste fundo
+    con.execute(f"""CREATE OR REPLACE TABLE consultoria_fundo AS
+        WITH b AS (SELECT {txt} FROM _c),
+        n AS (SELECT b.consultoria_chave, count(DISTINCT b.cnpj) AS n FROM b JOIN fundo f USING (cnpj)
+              WHERE b.consultoria_situacao = 'nomeada'
+                AND f.ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH GROUP BY 1)
+        SELECT b.*, n.n AS consultoria_n_fundos,
+               CASE WHEN b.consultoria_situacao <> 'nomeada' OR b.consultoria_chave IS NULL THEN NULL
+                    WHEN b.consultoria_relacionada = 'Sim' THEN 'parte relacionada'
+                    WHEN coalesce(n.n, 1) >= 2 THEN 'consultoria de mercado'
+                    ELSE 'consultoria de apoio' END AS consultoria_tipo
+        FROM b LEFT JOIN n USING (consultoria_chave)""")
     con.unregister("_c")
     # por consultoria: fundos ativos que ela atende e como eles estão (último informe)
     con.execute("""

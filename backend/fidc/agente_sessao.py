@@ -53,6 +53,9 @@ for x in (r.get("series") or [] if si else []):
         erros.append(f"série spread_aa em % a.a. (3,5% -> 3.5), não fração: {x['spread_aa']}")
     if isinstance(x.get("pct_cdi"), (int, float)) and 0 < x["pct_cdi"] < 5:
         erros.append(f"série pct_cdi em % (120% do CDI -> 120): {x['pct_cdi']}")
+tc = r.get("taxa_consultoria_aa") if "taxa_consultoria_aa" in props else None
+if tc is not None and (not isinstance(tc, (int, float)) or not 0 <= tc <= 0.2):
+    erros.append(f"taxa_consultoria_aa como fração ao ano (0,5% -> 0.005), veio {tc!r}")
 if j.get("cnpj") not in open(f"{D}/lista_{nn}.txt").read().split():
     erros.append(f"CNPJ {j.get('cnpj')} não está na lista_{nn}")
 if erros:

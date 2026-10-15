@@ -75,10 +75,11 @@ def _cadastro() -> dict[str, dict]:
         return {}
     con = sqlite3.connect(db)
     out = {}
-    for c, rs, nf, soc, nat, cap, cnae, ativ in con.execute(
-            "SELECT cnpj, razao_social, nome_fantasia, socios, natureza, capital_social, cnae, cnae_desc "
+    for c, rs, nf, soc, nat, cap, cnae, ativ, ab in con.execute(
+            "SELECT cnpj, razao_social, nome_fantasia, socios, natureza, capital_social, cnae, cnae_desc, abertura "
             "FROM cedente_info WHERE erro IS NULL"):
         out[c] = {"razao": rs, "fantasia": nf, "natureza": nat, "capital": cap, "cnae": cnae, "atividade": ativ,
+                  "abertura": ab,
                   "socios": [s.get("nome") for s in json.loads(soc or "[]") if s.get("nome")]}
     return out
 
@@ -220,6 +221,12 @@ def build_table(con) -> None:
         ia = mono_ia.linhas()
     except Exception:  # noqa: BLE001
         ia = {}
+    try:
+        cons = {c: (n, re.sub(r"\D", "", cj or "")) for c, n, cj in con.execute(
+            "SELECT cnpj, consultoria, consultoria_cnpj FROM consultoria_fundo WHERE consultoria_situacao = 'nomeada'"
+            ).fetchall()}
+    except Exception:  # noqa: BLE001 - base sem consultoria
+        cons = {}
     linhas, grupos_out = [], []
     for f in fundos.itertuples(index=False):
         cs = por_fundo.get(f.cnpj, [])
@@ -333,6 +340,22 @@ def build_table(con) -> None:
         elif grande:
             faixa = "excluído (grande empresa)"
             sinais.insert(0, "fora: cedente grande empresa - " + grande)
+        # consultoria de crédito x grupo do cedente: mesma raiz, sócio em comum ou mesmo nome
+        cn, cdoc = cons.get(f.cnpj, (None, ""))
+        ligada, ccad = None, cad.get(cdoc, {}) if cdoc else {}
+        if cn and g1:
+            docs = g1["docs"]
+            soc_g = {_norm(x).strip() for d in docs for x in cad.get(d, {}).get("socios", [])}
+            soc_c = {_norm(x).strip() for x in ccad.get("socios", [])}
+            nom_g = {(_tokens(cad.get(d, {}).get("razao")) or [None])[0] for d in docs} - {None}
+            if cdoc and cdoc in docs:
+                ligada = "a consultoria é o próprio cedente"
+            elif cdoc and cdoc[:8] in {d[:8] for d in docs}:
+                ligada = "mesma raiz de CNPJ do cedente"
+            elif soc_c & soc_g:
+                ligada = "sócio em comum com o cedente: " + ", ".join(sorted(soc_c & soc_g)[:2]).title()
+            elif (_tokens(ccad.get("razao") or cn) or [None])[0] in nom_g:
+                ligada = "mesmo nome do cedente"
         r = rot.get(f.cnpj, {})
         linhas.append({
             "cnpj": f.cnpj, "mono_grupo": g1["nome"] if g1 else None,
@@ -348,6 +371,9 @@ def build_table(con) -> None:
             "bt_ia_coobrigacao": x.get("coobrigacao_cedente"), "bt_ia_indicio": ind,
             "bt_ia_justificativa": x.get("justificativa"), "bt_ia_trecho": x.get("trecho"), "bt_ia_pagina": x.get("pagina"),
             "bt_ia_cedente": x.get("cedente_nome"), "bt_ia_objetivo": x.get("objetivo"),
+            "mono_consultoria_ligada": ligada, "mono_consultoria_cnae": ccad.get("cnae"),
+            "mono_consultoria_atividade": ccad.get("atividade"), "mono_consultoria_abertura": ccad.get("abertura"),
+            "mono_consultoria_capital": ccad.get("capital"),
         })
     df = pd.DataFrame(linhas)
     con.register("_m", df)

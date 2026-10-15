@@ -393,8 +393,15 @@ def monocedentes(todos: bool = False, formato: str | None = None):
                       rf.rem_senior_spread_min, rf.rem_senior_spread_max, rf.rem_senior_pct_cdi, rf.rem_senior_n,
                       rf.rem_senior_doc, rf.rem_senior_data, rf.rem_senior_alvo_aa, rf.rem_senior_entregue_aa, rf.rem_senior_gap_aa,
                       r.rentab_senior_12m_pct_cdi, rf.rem_mez_texto, rf.rem_mez_spread_aa, rf.rem_mez_pct_cdi,
-                      rf.rem_mez_alvo_aa, rf.rem_mez_entregue_aa, rf.rem_mez_gap_aa, rf.rem_sub, rf.rem_confianca, rf.rem_obs
+                      rf.rem_mez_alvo_aa, rf.rem_mez_entregue_aa, rf.rem_mez_gap_aa, rf.rem_sub, rf.rem_confianca, rf.rem_obs,
+                      r.taxa_administracao_min_mes, r.taxa_gestao_min_mes,
+                      cf.consultoria, cf.consultoria_cnpj, cf.consultoria_situacao, cf.consultoria_tipo,
+                      cf.consultoria_n_fundos, cf.consultoria_relacionada, cf.consultoria_taxa_txt, cf.consultoria_taxa_aa,
+                      cf.consultoria_taxa_min_mes, cf.consultoria_paga_por, cf.consultoria_origem,
+                      m.mono_consultoria_ligada, m.mono_consultoria_cnae, m.mono_consultoria_atividade,
+                      m.mono_consultoria_abertura, m.mono_consultoria_capital
                FROM mono_fundo m JOIN fundo f USING (cnpj)
+               LEFT JOIN consultoria_fundo cf ON cf.cnpj = f.cnpj
                LEFT JOIN rem_fundo rf ON rf.cnpj = f.cnpj
                LEFT JOIN metricas_mes me ON me.cnpj = f.cnpj AND me.dt = f.ultimo_informe
                LEFT JOIN fundo_resumo r ON r.cnpj = f.cnpj

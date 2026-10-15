@@ -16,7 +16,44 @@ gestor_resumo / admin_resumo: AuM, fundos ativos e medianas por casa (fundos ati
 """
 from __future__ import annotations
 
+import re
+
 ATIVO = "f.ultimo_informe >= (SELECT ultimo_mes_completo FROM _meta) - INTERVAL 3 MONTH"
+
+
+_MIN = re.compile(r"m[íi]nim[oa]s?\b(?P<per>[^R$;]{0,40}?)R\$\s*(?P<v>\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+(?:,\d+)?)\s*(?P<mil>mil\b)?",
+                  re.I)
+
+
+def minimo_mensal(txt: str | None) -> float | None:
+    """Piso da taxa em R$ por mês, do texto do regulamento ("mínimo mensal de R$ 15.000,00", "mínimo de R$ 8 mil
+    por mês"). Com escalonamento, fica o primeiro valor citado; mínimo anual vira mensal (/12)."""
+    m = _MIN.search(txt or "")
+    if not m:
+        return None
+    v = float(m["v"].replace(".", "").replace(",", ".")) * (1000 if m["mil"] else 1)
+    resto = (m["per"] + (txt or "")[m.end():m.end() + 30]).lower()
+    return v / 12 if re.search(r"\banua", resto) and not re.search(r"mensa|m[êe]s", resto) else v
+
+
+def _minimos(con) -> None:
+    import pandas as pd
+    rows = con.execute("""SELECT cnpj, campo, valor_txt FROM regulamento_param
+                          WHERE campo IN ('taxa_administracao', 'taxa_gestao') AND valor_txt IS NOT NULL""").fetchall()
+    d = {}
+    for c, campo, t in rows:
+        v = minimo_mensal(t)
+        if v is not None and v > 0:
+            d.setdefault(c, {})[campo] = max(v, d.get(c, {}).get(campo, 0))
+    df = pd.DataFrame([{"cnpj": c, "adm": x.get("taxa_administracao"), "gest": x.get("taxa_gestao")} for c, x in d.items()],
+                      columns=["cnpj", "adm", "gest"]).astype({"adm": "float64", "gest": "float64"})
+    con.register("_mn", df)
+    con.execute("""
+        ALTER TABLE fundo_resumo ADD COLUMN taxa_administracao_min_mes DOUBLE;
+        ALTER TABLE fundo_resumo ADD COLUMN taxa_gestao_min_mes DOUBLE;
+        UPDATE fundo_resumo r SET taxa_administracao_min_mes = m.adm, taxa_gestao_min_mes = m.gest FROM _mn m
+        WHERE m.cnpj = r.cnpj""")
+    con.unregister("_mn")
 
 
 def build_table(con) -> None:
@@ -97,6 +134,7 @@ def build_table(con) -> None:
         UPDATE fundo_resumo SET rentab_senior_12m_pct_cdi = rentab_senior_12m / nullif(cdi_12m, 0),
                                 rentab_mezanino_12m_pct_cdi = rentab_mezanino_12m / nullif(cdi_12m, 0),
                                 rentab_subordinada_12m_pct_cdi = rentab_subordinada_12m / nullif(cdi_12m, 0)""")
+    _minimos(con)
     for nome, col in (("gestor_resumo", "gestor"), ("admin_resumo", "admin")):
         con.execute(f"""
             CREATE OR REPLACE TABLE {nome} AS
