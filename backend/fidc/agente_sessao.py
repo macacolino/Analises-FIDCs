@@ -375,7 +375,7 @@ def importar(d: str) -> dict:
         return re.sub(r"[^a-z0-9]", "", rg._norm(t))
     vistos, linhas, suspeitos = set(), [], []
     for f in sorted(glob.glob(str(base / "out" / "*.jsonl"))):
-        for l in open(f, encoding="utf-8"):
+        for l in reversed(open(f, encoding="utf-8").readlines()):   # regravação: vale a última linha do CNPJ
             if not l.strip():
                 continue
             j = json.loads(l)
